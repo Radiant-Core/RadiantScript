@@ -1,0 +1,9 @@
+contract Test() {
+    return {
+        hello() {
+            bytes3 byte_ = 0x1234;
+            sig s = bytes(0x1234);
+            require(byte_.length == bytes(s).length);
+        }
+    }
+}

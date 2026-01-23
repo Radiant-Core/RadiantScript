@@ -1,0 +1,10 @@
+pragma radiantscript ^0.1.0;
+
+contract Test() {
+    return {
+        test() {
+            int d = date("not a date");
+            require(d == 0);
+        }
+    }
+}

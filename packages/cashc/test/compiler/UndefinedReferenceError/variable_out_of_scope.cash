@@ -1,0 +1,11 @@
+contract Test() {
+    return {
+        unlock(int a, int b) {
+            if (a == b) {
+                int c = a;
+                require (c == a);
+            }
+            require(c == b);
+        }
+    }
+}

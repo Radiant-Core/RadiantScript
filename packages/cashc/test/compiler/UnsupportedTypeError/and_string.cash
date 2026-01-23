@@ -1,0 +1,7 @@
+contract Test() {
+    return {
+        hello(string who) {
+            require(who && "hello");
+        }
+    }
+}

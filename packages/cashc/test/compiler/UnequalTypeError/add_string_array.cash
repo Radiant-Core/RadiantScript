@@ -1,0 +1,7 @@
+contract Test(string x, string y) {
+    return {
+        hello() {
+            require(([y] + x).length > 50);
+        }
+    }
+}

@@ -1,0 +1,7 @@
+contract Test() {
+    return {
+        hello(int a) {
+            require(a(0) == 0);
+        }
+    }
+}

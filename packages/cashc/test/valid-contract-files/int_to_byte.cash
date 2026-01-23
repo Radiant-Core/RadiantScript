@@ -1,0 +1,8 @@
+contract IntToByte() {
+    return {
+        hello(int a, byte b) {
+            byte c = byte(a);
+            require(b == c);
+        }
+    }
+}

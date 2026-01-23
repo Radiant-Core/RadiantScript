@@ -1,0 +1,8 @@
+contract Test() {
+    return {
+        hello() {
+            bytes1 b = bytes1(0x1234);
+            require(b.length == 1);
+        }
+    }
+}

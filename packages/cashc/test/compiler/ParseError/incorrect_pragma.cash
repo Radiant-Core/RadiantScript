@@ -1,0 +1,14 @@
+// cspell:disable-next-line
+pragma cashscrip 0.2.0;
+
+contract Test() {
+    return {
+        hello(sig s, pubkey pk) {
+            require(checkSig(s, pk));
+        },
+
+        world(int a) {
+            require(a + 5 == 10);
+        }
+    }
+}

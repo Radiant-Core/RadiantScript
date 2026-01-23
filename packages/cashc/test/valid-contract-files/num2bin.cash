@@ -1,0 +1,8 @@
+contract Test() {
+    return {
+        hello() {
+            bytes2 byte_ = bytes2(10);
+            require(int(byte_) == 10);
+        }
+    }
+}

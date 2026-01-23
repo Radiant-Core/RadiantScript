@@ -1,0 +1,7 @@
+contract Test() {
+    return {
+        hello(bool b) {
+            require(ripemd160(true, b) == 0x0);
+        }
+    }
+}

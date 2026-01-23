@@ -1,0 +1,9 @@
+contract Test() {
+    return {
+        test() {
+            int constant m = 5;
+            m = m + 5;
+            require(m > 2);
+        }
+    }
+}

@@ -1,0 +1,8 @@
+contract Test() {
+    return {
+        hello() {
+            string y = "Hello";
+            y = 0x000000fefe00;
+        }
+    }
+}

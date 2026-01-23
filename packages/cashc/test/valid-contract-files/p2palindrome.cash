@@ -1,0 +1,7 @@
+contract P2Palindrome() {
+    return {
+        spend(string palindrome) {
+            require(palindrome.reverse() == palindrome);
+        }
+    }
+}

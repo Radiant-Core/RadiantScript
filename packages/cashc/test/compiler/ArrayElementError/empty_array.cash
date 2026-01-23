@@ -1,0 +1,8 @@
+contract Test() {
+    return {
+        hello() {
+            int x = [];
+            require(x > 1);
+        }
+    }
+}

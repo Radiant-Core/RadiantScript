@@ -1,0 +1,7 @@
+contract Test(int x) {
+    return {
+        hello() {
+            require(tx.time >= bool(x));
+        }
+    }
+}

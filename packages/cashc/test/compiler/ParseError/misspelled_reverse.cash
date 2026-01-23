@@ -1,0 +1,9 @@
+contract Test() {
+    return {
+        hello(bytes a) {
+            // cspell:disable-next-lines
+            bytes b = a.revese()
+            require(b == a);
+        }
+    }
+}

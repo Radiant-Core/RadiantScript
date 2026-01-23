@@ -1,0 +1,10 @@
+contract Test() {
+    return {
+        hello(sig s, pubkey pk) {
+            int v = 10;
+            string ripemd160 = 'hello';
+
+            require(checkSig(s, pk) && v < 10);
+        }
+    }
+}

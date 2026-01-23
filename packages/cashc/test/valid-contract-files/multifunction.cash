@@ -1,0 +1,16 @@
+contract MultiFunction(
+    pubkey sender,
+    pubkey recipient,
+    int timeout
+) {
+    return {
+        transfer(sig recipientSig) {
+            require(checkSig(recipientSig, recipient));
+        },
+
+        timeout(sig senderSig) {
+            require(checkSig(senderSig, sender));
+            require(tx.time >= timeout);
+        }
+    }
+}

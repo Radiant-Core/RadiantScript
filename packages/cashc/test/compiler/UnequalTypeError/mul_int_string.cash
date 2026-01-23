@@ -1,0 +1,7 @@
+contract Test(int x, int y) {
+    return {
+        hello() {
+            require((x * "50") == y);
+        }
+    }
+}

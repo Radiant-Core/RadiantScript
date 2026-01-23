@@ -1,0 +1,11 @@
+contract Test(int x) {
+    return {
+        hello() {
+            require(world(x));
+        },
+
+        world(int a) {
+            require(a + 5 == 10);
+        }
+    }
+}

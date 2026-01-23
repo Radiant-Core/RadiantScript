@@ -1,0 +1,7 @@
+contract Test(int y) {
+    return {
+        hello() {
+            require(bytes2(y, 2) == 0x0000);
+        }
+    }
+}

@@ -1,0 +1,46 @@
+pragma radiantscript ^0.9.0;
+
+// NFT - Non-Fungible Token (Singleton) contract for Radiant
+// Uses singleton references to ensure uniqueness
+//
+// Features:
+// - Guaranteed uniqueness via pushInputRefSingleton
+// - Owner-controlled transfers
+// - Immutable token identity
+//
+// Usage:
+//   1. Mint NFT with unique reference using pushInputRefSingleton
+//   2. Only one UTXO can hold this reference at a time
+//   3. Transfer ownership by spending with valid signature
+
+contract NFT(
+    bytes36 constant $nftRef,  // The unique NFT reference
+    pubkey ownerPk             // Current owner's public key
+) {
+    // Transfer NFT to new owner
+    // Singleton ensures only one output can carry this reference
+    function transfer(sig s) {
+        // Verify current owner's signature
+        require(checkSig(s, ownerPk));
+        
+        // Push as singleton - enforces exactly one output has this ref
+        pushInputRefSingleton($nftRef);
+        
+        // Verify the NFT exists in exactly one output
+        int outputCount = tx.outputs.refOutputCount($nftRef);
+        require(outputCount == 1);
+    }
+    
+    // Transfer with data update (e.g., metadata pointer)
+    function transferWithData(sig s, bytes newData) {
+        require(checkSig(s, ownerPk));
+        
+        pushInputRefSingleton($nftRef);
+        
+        // Ensure singleton property
+        require(tx.outputs.refOutputCount($nftRef) == 1);
+        
+        // newData can be used in the output script's state section
+        // to update metadata or other associated data
+    }
+}

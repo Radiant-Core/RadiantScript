@@ -1,0 +1,7 @@
+contract Test() {
+    return {
+        hello(sig s, pubkey p) {
+            require(checkDataSig(s, "Hello", p));
+        }
+    }
+}

@@ -1,0 +1,8 @@
+contract P2PKH(bytes20 pkh) {
+    return {
+        spend(sig s, pubkey pk) {
+            require(hash160(pk) == pkh);
+            require(checkSig(s, pk));
+        }
+    }
+}

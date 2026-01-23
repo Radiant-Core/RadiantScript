@@ -1,0 +1,7 @@
+contract Test() {
+    return {
+        hello() {
+            require(!!0x40 == 0x50);
+        }
+    }
+}

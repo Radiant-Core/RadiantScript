@@ -1,0 +1,11 @@
+pragma radiantscript ^0.1.0;
+
+contract P2PKH(bytes20 pkh) {
+    return {
+        spend(pubkey pk, sig s) {
+            bytes20 passedPkh = hash160(pk);
+            require(passedPkh == pkh);
+            require(checkSig(s, pk));
+        }
+    }
+}

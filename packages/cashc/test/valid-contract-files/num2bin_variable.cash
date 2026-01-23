@@ -1,0 +1,8 @@
+contract Num2Bin() {
+    return {
+        spend(int size) {
+            bytes byte_ = bytes(10, size);
+            require(int(byte_) == 10);
+        }
+    }
+}

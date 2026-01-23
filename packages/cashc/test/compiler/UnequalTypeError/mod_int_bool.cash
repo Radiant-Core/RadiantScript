@@ -1,0 +1,7 @@
+contract Test(int x) {
+    return {
+        hello(int t) {
+            require(x % true > t);
+        }
+    }
+}

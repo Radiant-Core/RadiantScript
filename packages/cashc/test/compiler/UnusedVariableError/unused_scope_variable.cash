@@ -1,0 +1,9 @@
+contract Test() {
+    return {
+        hello(sig s, pubkey pk) {
+            if (checkSig(s, pk)) {
+                string x = 'Hello';
+            }
+        }
+    }
+}

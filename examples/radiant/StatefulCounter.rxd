@@ -1,0 +1,40 @@
+pragma radiantscript ^0.9.0;
+
+// StatefulCounter - Demonstrates state management with state separator
+// Uses OP_STATESEPARATOR to split state from code
+//
+// Features:
+// - Persistent counter state across transactions
+// - Code script verification ensures logic cannot change
+// - State section can be updated while preserving contract logic
+//
+// Usage:
+//   1. Deploy with initial counter value in state section
+//   2. Increment by spending with valid signature
+//   3. Contract verifies output has same code script
+
+contract StatefulCounter(
+    pubkey ownerPk
+) function(int currentCount) {
+    // State section: currentCount is passed as function parameter
+    // and stored before the state separator
+    int newCount = currentCount + 1;
+    
+    stateSeparator;
+    
+    // Code section: logic that must remain unchanged
+    function increment(sig s) {
+        require(checkSig(s, ownerPk));
+        
+        // Get the code script hash of this input
+        bytes myCodeScript = tx.inputs[this.activeInputIndex].codeScript;
+        bytes myCodeHash = hash256(myCodeScript);
+        
+        // Verify at least one output has the same code script
+        int sameCodeOutputs = tx.outputs.codeScriptCount(myCodeHash);
+        require(sameCodeOutputs >= 1);
+        
+        // The new state (newCount) will be in the output's state section
+        // This is handled by the transaction builder
+    }
+}

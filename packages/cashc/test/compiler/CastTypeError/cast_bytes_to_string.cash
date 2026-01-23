@@ -1,0 +1,7 @@
+contract Test(string y) {
+    return {
+        hello() {
+            require(string(0x4801) == y);
+        }
+    }
+}

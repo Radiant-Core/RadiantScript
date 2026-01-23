@@ -1,0 +1,7 @@
+contract Test() {
+    return {
+        spend() {
+            require(tx.inputs[0].lockingBytecode == "0x01");
+        }
+    }
+}

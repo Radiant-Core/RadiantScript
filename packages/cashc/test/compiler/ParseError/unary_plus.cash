@@ -1,0 +1,8 @@
+contract Test() {
+    return {
+        hello(int a) {
+            int b = 10 - +4;
+            require(b == a);
+        }
+    }
+}

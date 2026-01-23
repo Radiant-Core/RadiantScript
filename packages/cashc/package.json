@@ -1,0 +1,61 @@
+{
+  "name": "rxdc",
+  "version": "0.7.2",
+  "description": "Compile RadiantScript contracts to Radiant Script or artifacts",
+  "keywords": [
+    "radiant",
+    "radiantscript",
+    "rxd",
+    "compiler",
+    "smart contracts"
+  ],
+  "homepage": "https://github.com/Radiant-Core/RadiantScript",
+  "bugs": {
+    "url": "https://github.com/Radiant-Core/RadiantScript/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Radiant-Core/RadiantScript.git"
+  },
+  "license": "MIT",
+  "author": "Rosco Kalis <roscokalis@gmail.com>",
+  "contributors": [
+    "Gabriel Cardona <gabriel@bitcoin.com>"
+  ],
+  "main": "dist/main/index",
+  "module": "dist/module/index",
+  "types": "dist/module/index",
+  "sideEffects": false,
+  "bin": {
+    "rxdc": "dist/main/cashc-cli.js"
+  },
+  "directories": {
+    "lib": "src",
+    "test": "test"
+  },
+  "scripts": {
+    "antlr": "antlr4ts -visitor -listener src/grammar/CashScript.g4",
+    "build": "npm run clean && npm run compile",
+    "clean": "rm -rf ./dist",
+    "compile": "npm run compile:main && npm run compile:module",
+    "compile:main": "tsc -p tsconfig.build.main.json",
+    "compile:module": "tsc -p tsconfig.build.module.json",
+    "lint": "eslint . --ext .ts --ignore-path ../../.eslintignore",
+    "prepublishOnly": "npm test && npm run lint",
+    "test": "jest --config=../../jest.config.js packages/cashc"
+  },
+  "dependencies": {
+    "@bitauth/libauth": "^1.19.1",
+    "@radiantscript/utils": "^0.7.2",
+    "antlr4ts": "^0.5.0-alpha.4",
+    "commander": "^12.0.0",
+    "semver": "^7.6.0"
+  },
+  "devDependencies": {
+    "@types/semver": "^7.5.8",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.3.3"
+  }
+}

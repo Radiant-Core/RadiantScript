@@ -1,0 +1,7 @@
+contract Test() {
+    return {
+        hello(string s) {
+            require(s);
+        }
+    }
+}

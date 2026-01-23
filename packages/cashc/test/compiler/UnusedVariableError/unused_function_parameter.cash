@@ -1,0 +1,7 @@
+contract Test() {
+    return {
+        hello(sig s, pubkey pk, string x) {
+            require(checkSig(s, pk));
+        }
+    }
+}

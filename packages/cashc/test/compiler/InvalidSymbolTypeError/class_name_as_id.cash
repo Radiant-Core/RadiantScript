@@ -1,0 +1,7 @@
+contract Test() {
+    return {
+        hello() {
+            require(LockingBytecodeP2PKH == bytes34(0));
+        }
+    }
+}

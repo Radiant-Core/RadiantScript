@@ -1,0 +1,6 @@
+contract Test(int x, string y) {
+    return {
+        bytes(sig s, pubkey pk) {
+        }
+    }
+}

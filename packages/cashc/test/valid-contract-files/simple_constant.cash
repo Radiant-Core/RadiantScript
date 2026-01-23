@@ -1,0 +1,8 @@
+contract Test() {
+    return {
+        hello() {
+            string constant m = "hello";
+            require(m == "hello");
+        }
+    }
+}

@@ -1,0 +1,9 @@
+contract Test() {
+    return {
+        hello() {
+            // Have to know what you're doing to force cast
+            bytes3 byte_ = bytes3(bytes(0x1234));
+            require(byte_.length == 1);
+        }
+    }
+}

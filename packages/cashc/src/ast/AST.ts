@@ -1,0 +1,411 @@
+import { Type, PrimitiveType, BytesType } from '@radiantscript/utils';
+import { PushRefOp, TimeOp } from './Globals.js';
+import AstVisitor from './AstVisitor.js';
+import { BinaryOperator, NullaryOperator, UnaryOperator } from './Operator.js';
+import { Location } from './Location.js';
+import { SymbolTable, Symbol } from './SymbolTable.js';
+
+export type Ast = SourceFileNode;
+
+export abstract class Node {
+  location?: Location;
+  abstract accept<T>(visitor: AstVisitor<T>): T;
+}
+
+export interface Named {
+  name: string;
+}
+
+export interface Typed {
+  type: Type;
+}
+
+export class SourceFileNode extends Node {
+  constructor(
+    public contract: ContractNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitSourceFile(this);
+  }
+}
+
+export class ContractNode extends Node implements Named {
+  symbolTable?: SymbolTable;
+  opRolls: Map<string, IdentifierNode> = new Map();
+  codeScriptIdentifiers: Set<Symbol> = new Set();
+
+  constructor(
+    public name: string,
+    public parameters: ParameterNode[],
+    public functions: FunctionDefinitionNode[],
+    public functionParameters: ParameterNode[] = [],
+    public stateScript?: StateScriptNode,
+    public statements: StatementNode[] = [],
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitContract(this);
+  }
+}
+
+export class FunctionDefinitionNode extends Node implements Named {
+  symbolTable?: SymbolTable;
+  opRolls: Map<string, IdentifierNode> = new Map();
+
+  constructor(
+    public name: string,
+    public parameters: ParameterNode[],
+    public body: BlockNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitFunctionDefinition(this);
+  }
+}
+
+export class ParameterNode extends Node implements Named, Typed {
+  scope?: string;
+
+  constructor(
+    public type: Type,
+    public name: string,
+    public modifier: string = '',
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitParameter(this);
+  }
+}
+
+export abstract class StatementNode extends Node {}
+
+export class VariableDefinitionNode extends StatementNode implements Named, Typed {
+  constructor(
+    public type: Type,
+    public modifier: string,
+    public name: string,
+    public expression: ExpressionNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitVariableDefinition(this);
+  }
+}
+
+export class TupleAssignmentNode extends StatementNode {
+  constructor(
+    public var1: { name:string, type:Type },
+    public var2: { name:string, type:Type },
+    public tuple: ExpressionNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitTupleAssignment(this);
+  }
+}
+
+export class AssignNode extends StatementNode {
+  constructor(
+    public identifier: IdentifierNode,
+    public expression: ExpressionNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitAssign(this);
+  }
+}
+
+export class TimeOpNode extends StatementNode {
+  constructor(
+    public timeOp: TimeOp,
+    public expression: ExpressionNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitTimeOp(this);
+  }
+}
+
+export class RequireNode extends StatementNode {
+  constructor(
+    public expression: ExpressionNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitRequire(this);
+  }
+}
+
+export class BranchNode extends StatementNode {
+  constructor(
+    public condition: ExpressionNode,
+    public ifBlock: BlockNode,
+    public elseBlock?: BlockNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitBranch(this);
+  }
+}
+
+export class BlockNode extends Node {
+  symbolTable?: SymbolTable;
+
+  constructor(
+    public statements?: StatementNode[],
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitBlock(this);
+  }
+}
+
+export abstract class ExpressionNode extends Node {
+  type?: Type;
+}
+
+export class CastNode extends ExpressionNode implements Typed {
+  constructor(
+    public type: Type,
+    public expression: ExpressionNode,
+    public size?: ExpressionNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitCast(this);
+  }
+}
+
+export class FunctionCallNode extends ExpressionNode {
+  constructor(
+    public identifier: IdentifierNode,
+    public parameters: ExpressionNode[],
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitFunctionCall(this);
+  }
+}
+
+export class InstantiationNode extends ExpressionNode {
+  constructor(
+    public identifier: IdentifierNode,
+    public parameters: ExpressionNode[],
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitInstantiation(this);
+  }
+}
+
+export class TupleIndexOpNode extends ExpressionNode {
+  constructor(
+    public tuple: ExpressionNode,
+    public index: number,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitTupleIndexOp(this);
+  }
+}
+
+export class BinaryOpNode extends ExpressionNode {
+  constructor(
+    public left: ExpressionNode,
+    public operator: BinaryOperator,
+    public right: ExpressionNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitBinaryOp(this);
+  }
+}
+
+export class UnaryOpNode extends ExpressionNode {
+  constructor(
+    public operator: UnaryOperator,
+    public expression: ExpressionNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitUnaryOp(this);
+  }
+}
+
+export class NullaryOpNode extends ExpressionNode {
+  constructor(
+    public operator: NullaryOperator,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitNullaryOp(this);
+  }
+}
+
+export class ArrayNode extends ExpressionNode {
+  constructor(
+    public elements: ExpressionNode[],
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitArray(this);
+  }
+}
+
+export class IdentifierNode extends ExpressionNode implements Named {
+  definition?: Symbol;
+
+  constructor(
+    public name: string,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitIdentifier(this);
+  }
+}
+
+export abstract class LiteralNode extends ExpressionNode {}
+
+export class BoolLiteralNode extends LiteralNode {
+  constructor(
+    public value: boolean,
+  ) {
+    super();
+    this.type = PrimitiveType.BOOL;
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitBoolLiteral(this);
+  }
+}
+
+export class IntLiteralNode extends LiteralNode {
+  constructor(
+    public value: number,
+  ) {
+    super();
+    this.type = PrimitiveType.INT;
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitIntLiteral(this);
+  }
+}
+
+export class StringLiteralNode extends LiteralNode {
+  constructor(
+    public value: string,
+    public quote: string,
+  ) {
+    super();
+    this.type = PrimitiveType.STRING;
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitStringLiteral(this);
+  }
+}
+
+export class HexLiteralNode extends LiteralNode {
+  constructor(
+    public value: Uint8Array,
+  ) {
+    super();
+    this.type = new BytesType(value.byteLength);
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitHexLiteral(this);
+  }
+}
+
+export class PushDataNode extends ExpressionNode {
+  constructor(
+    public data: HexLiteralNode | IdentifierNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitPushData(this);
+  }
+}
+
+export class PushRefNode extends ExpressionNode {
+  constructor(
+    public op: PushRefOp,
+    public ref: HexLiteralNode | IdentifierNode,
+    public drop: boolean,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitPushRef(this);
+  }
+}
+
+export class StateScriptNode extends StatementNode {
+  constructor(
+    public statements: StatementNode[] = [],
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitStateScript(this);
+  }
+}
+
+export class UnsetNode extends Node {
+  constructor(
+    public identifier: IdentifierNode,
+  ) {
+    super();
+  }
+
+  accept<T>(visitor: AstVisitor<T>): T {
+    return visitor.visitUnset(this);
+  }
+}

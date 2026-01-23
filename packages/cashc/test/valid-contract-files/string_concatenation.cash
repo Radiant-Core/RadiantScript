@@ -1,0 +1,7 @@
+contract Test() {
+    return {
+        hello(string who) {
+            require(("hello " + who).length + 2 > 5);
+        }
+    }
+}

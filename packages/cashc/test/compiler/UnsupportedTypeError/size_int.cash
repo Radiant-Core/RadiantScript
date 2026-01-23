@@ -1,0 +1,7 @@
+contract Test(int x, string y) {
+    return {
+        hello() {
+            require(x.length > y.length);
+        }
+    }
+}

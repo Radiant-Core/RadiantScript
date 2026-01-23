@@ -1,0 +1,51 @@
+pragma radiantscript ^0.9.0;
+
+// FungibleToken - A standard fungible token contract for Radiant
+// Uses reference-based token tracking with conservation enforcement
+//
+// Features:
+// - Token transfers with signature verification
+// - Automatic supply conservation (inputs == outputs)
+// - Support for zero-valued token outputs (change)
+//
+// Usage:
+//   1. Create token by minting with a unique reference
+//   2. Transfer by spending token UTXOs with valid signature
+//   3. Conservation is automatically enforced
+
+contract FungibleToken(
+    bytes36 constant $tokenRef,  // The unique token reference (txid:vout)
+    pubkey ownerPk               // Owner's public key
+) {
+    // Transfer tokens to new outputs
+    // Conservation rule: sum of input token values == sum of output token values
+    function transfer(sig s) {
+        // Verify owner's signature
+        require(checkSig(s, ownerPk));
+        
+        // Push the token reference to track it
+        pushInputRef($tokenRef);
+        
+        // Get sum of token values in inputs and outputs
+        int inputTokens = tx.inputs.refValueSum($tokenRef);
+        int outputTokens = tx.outputs.refValueSum($tokenRef);
+        
+        // Enforce conservation: no tokens created or destroyed
+        require(inputTokens == outputTokens);
+    }
+    
+    // Burn tokens (reduce supply)
+    // Allows intentional destruction of tokens
+    function burn(sig s, int burnAmount) {
+        require(checkSig(s, ownerPk));
+        
+        pushInputRef($tokenRef);
+        
+        int inputTokens = tx.inputs.refValueSum($tokenRef);
+        int outputTokens = tx.outputs.refValueSum($tokenRef);
+        
+        // Output tokens should be less by burn amount
+        require(inputTokens - burnAmount == outputTokens);
+        require(burnAmount > 0);
+    }
+}

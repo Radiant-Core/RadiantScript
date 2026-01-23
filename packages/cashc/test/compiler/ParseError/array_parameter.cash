@@ -1,0 +1,9 @@
+contract Test(int x, string y) {
+    return {
+        hello(int[] a) {
+        },
+
+        world(int a) {
+        }
+    }
+}

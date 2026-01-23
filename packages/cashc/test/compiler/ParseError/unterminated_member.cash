@@ -1,0 +1,8 @@
+contract Test() {
+    return {
+        hello(bytes a) {
+            bytes b = a.reverse(
+            require(b == a);
+        }
+    }
+}

@@ -1,0 +1,8 @@
+contract Test() {
+    return {
+        hello() {
+            pubkey pk = 0x00;
+            require(bytes(pk) == 0x00);
+        }
+    }
+}

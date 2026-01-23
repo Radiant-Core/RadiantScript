@@ -1,0 +1,11 @@
+contract Test(int x, string x) {
+    return {
+        hello(sig s, pubkey pk) {
+            require(checkSig(s, pk));
+        },
+
+        world(int a) {
+            require(a + 5 == 10);
+        }
+    }
+}

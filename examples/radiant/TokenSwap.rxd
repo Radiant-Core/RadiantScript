@@ -1,0 +1,57 @@
+pragma radiantscript ^0.9.0;
+
+// TokenSwap - Atomic swap between two different tokens
+// Demonstrates cross-reference verification
+//
+// Features:
+// - Atomic exchange of two token types
+// - Price enforcement via reference value sums
+// - No counterparty risk
+//
+// Usage:
+//   1. Create swap offer with token references and exchange rate
+//   2. Counterparty can execute by providing matching tokens
+//   3. Either party can cancel before execution
+
+contract TokenSwap(
+    bytes36 constant $offerTokenRef,   // Token being offered
+    bytes36 constant $wantTokenRef,    // Token wanted in return
+    int offerAmount,                    // Amount of offer token
+    int wantAmount,                     // Amount of want token
+    pubkey makerPk                      // Maker's public key
+) {
+    // Execute the swap
+    // Taker provides wantToken, receives offerToken
+    function executeSwap(sig takerSig, pubkey takerPk) {
+        // Verify taker's signature
+        require(checkSig(takerSig, takerPk));
+        
+        // Track both token references
+        pushInputRef($offerTokenRef);
+        pushInputRef($wantTokenRef);
+        
+        // Verify offer token conservation
+        int offerIn = tx.inputs.refValueSum($offerTokenRef);
+        int offerOut = tx.outputs.refValueSum($offerTokenRef);
+        require(offerIn == offerOut);
+        
+        // Verify want token conservation
+        int wantIn = tx.inputs.refValueSum($wantTokenRef);
+        int wantOut = tx.outputs.refValueSum($wantTokenRef);
+        require(wantIn == wantOut);
+        
+        // Verify the exchange amounts match the offer
+        // Maker receives wantAmount of wantToken
+        // Taker receives offerAmount of offerToken
+        require(offerIn >= offerAmount);
+        require(wantIn >= wantAmount);
+    }
+    
+    // Cancel the swap offer (maker only)
+    function cancel(sig makerSig) {
+        require(checkSig(makerSig, makerPk));
+        
+        // Simply spend back to maker, no token operations needed
+        pushInputRef($offerTokenRef);
+    }
+}

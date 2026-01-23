@@ -1,0 +1,55 @@
+pragma radiantscript ^0.9.0;
+
+// MultiSigVault - Multi-signature vault with Radiant introspection
+// Demonstrates 2-of-3 multisig with output verification
+//
+// Features:
+// - 2-of-3 multi-signature requirement
+// - Output amount verification using introspection
+// - Dust threshold enforcement
+//
+// Usage:
+//   1. Lock funds with 3 public keys
+//   2. Spend requires 2 valid signatures
+//   3. Can enforce minimum output amounts
+
+contract MultiSigVault(
+    pubkey pk1,
+    pubkey pk2,
+    pubkey pk3
+) {
+    // Standard 2-of-3 multisig spend
+    function spend(sig s1, sig s2) {
+        require(checkMultiSig([s1, s2], [pk1, pk2, pk3]));
+    }
+    
+    // Spend with output verification
+    // Ensures a minimum amount goes to a specific output
+    function spendWithMinOutput(sig s1, sig s2, int minAmount) {
+        require(checkMultiSig([s1, s2], [pk1, pk2, pk3]));
+        
+        // Verify first output has at least minAmount
+        require(tx.outputs[0].value >= minAmount);
+        
+        // Ensure no dust outputs (minimum 546 satoshis)
+        int numOutputs = tx.outputs.length;
+        // Note: Loop unrolling would be needed for variable iteration
+        // This example checks first 3 outputs
+        if (numOutputs >= 1) {
+            require(tx.outputs[0].value >= 546);
+        }
+        if (numOutputs >= 2) {
+            require(tx.outputs[1].value >= 546);
+        }
+        if (numOutputs >= 3) {
+            require(tx.outputs[2].value >= 546);
+        }
+    }
+    
+    // Emergency recovery by any single key after timelock
+    function emergencyRecover(sig s, pubkey pk) {
+        require(tx.age >= 52560);  // ~1 year in blocks
+        require(pk == pk1 || pk == pk2 || pk == pk3);
+        require(checkSig(s, pk));
+    }
+}

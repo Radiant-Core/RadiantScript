@@ -1,0 +1,11 @@
+language: node_js
+
+node_js:
+  - '22'
+
+script:
+  - npm test
+  - npm run lint
+
+notifications:
+  email: false

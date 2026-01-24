@@ -69,28 +69,7 @@ export const fixtures: Fixture[] = [
         },
       ],
       asm:
-        '$y $x '
-        // int d = a + b
-        + 'OP_2OVER OP_ADD '
-        // d = d - a
-        + 'OP_DUP OP_5 OP_PICK OP_SUB '
-        // if (d == x - 2) {
-        + 'OP_DUP OP_3 OP_ROLL OP_2 OP_SUB OP_NUMEQUAL OP_IF '
-        // int c = d + b
-        + 'OP_DUP OP_4 OP_PICK OP_ADD '
-        // d = a + c
-        + 'OP_5 OP_PICK OP_OVER OP_ADD OP_ROT OP_DROP OP_SWAP '
-        // require(c > d)
-        + 'OP_2DUP OP_LESSTHAN OP_VERIFY '
-        // } else {
-        + 'OP_DROP OP_ELSE '
-        // require(d == a) }
-        + 'OP_DUP OP_5 OP_PICK OP_NUMEQUALVERIFY OP_ENDIF '
-        // d = d + a
-        + 'OP_DUP OP_5 OP_ROLL OP_ADD '
-        // require(d == y)
-        + 'OP_3 OP_ROLL OP_NUMEQUAL '
-        + 'OP_NIP OP_NIP OP_NIP',
+        'OP_2DUP OP_ADD OP_DUP OP_3 OP_PICK OP_SUB OP_DUP $x OP_2 OP_SUB OP_NUMEQUAL OP_IF OP_DUP OP_3 OP_PICK OP_ADD OP_4 OP_PICK OP_OVER OP_ADD OP_ROT OP_DROP OP_SWAP OP_2DUP OP_LESSTHAN OP_VERIFY OP_DROP OP_ELSE OP_DUP OP_4 OP_PICK OP_NUMEQUALVERIFY OP_ENDIF OP_DUP OP_4 OP_ROLL OP_ADD $y OP_NUMEQUAL OP_NIP OP_NIP OP_NIP',
     },
   },
   {
@@ -139,50 +118,7 @@ export const fixtures: Fixture[] = [
         { type: 'constructor', params: [{ name: 'x', type: 'int' }, { name: 'y', type: 'int' }] },
       ],
       asm:
-        '$y $x '
-        // function transfer
-        + 'OP_2 OP_PICK OP_0 OP_NUMEQUAL OP_IF '
-        // int d = a + b
-        + 'OP_4 OP_PICK OP_4 OP_PICK OP_ADD '
-        // d = d - a
-        + 'OP_DUP OP_6 OP_PICK OP_SUB '
-        // if (d == x) {
-        + 'OP_DUP OP_3 OP_ROLL OP_NUMEQUAL OP_IF '
-        // int c = d + b
-        + 'OP_DUP OP_5 OP_PICK OP_ADD '
-        // d = a + c
-        + 'OP_6 OP_PICK OP_OVER OP_ADD OP_ROT OP_DROP OP_SWAP '
-        // require(c > d)
-        + 'OP_2DUP OP_LESSTHAN OP_VERIFY '
-        // } else {
-        + 'OP_DROP OP_ELSE '
-        // d = a }
-        + 'OP_5 OP_PICK OP_NIP OP_ENDIF '
-        // d = d + a
-        + 'OP_DUP OP_6 OP_ROLL OP_ADD '
-        // require(d == y)
-        + 'OP_3 OP_ROLL OP_NUMEQUALVERIFY '
-        + 'OP_2DROP OP_2DROP OP_1 OP_ELSE '
-        // function timeout
-        + 'OP_ROT OP_1 OP_NUMEQUALVERIFY '
-        // int d = b
-        + 'OP_2 OP_PICK '
-        // d = d + 2
-        + 'OP_DUP OP_2 OP_ADD '
-        // if (d == x) {
-        + 'OP_DUP OP_3 OP_ROLL OP_NUMEQUAL OP_IF '
-        // int c = d + b
-        + 'OP_DUP OP_4 OP_PICK OP_ADD '
-        // d = c + d
-        + 'OP_2DUP OP_ADD OP_ROT OP_DROP OP_SWAP '
-        // require(c > d) }
-        + 'OP_2DUP OP_LESSTHAN OP_VERIFY '
-        + 'OP_DROP OP_ENDIF '
-        // d = b
-        + ''
-        // require(d == y)
-        + 'OP_2SWAP OP_NUMEQUAL '
-        + 'OP_NIP OP_NIP OP_ENDIF',
+        'OP_DUP OP_0 OP_NUMEQUAL OP_IF OP_2 OP_PICK OP_2 OP_PICK OP_ADD OP_DUP OP_4 OP_PICK OP_SUB OP_DUP $x OP_NUMEQUAL OP_IF OP_DUP OP_4 OP_PICK OP_ADD OP_5 OP_PICK OP_OVER OP_ADD OP_ROT OP_DROP OP_SWAP OP_2DUP OP_LESSTHAN OP_VERIFY OP_DROP OP_ELSE OP_4 OP_PICK OP_NIP OP_ENDIF OP_DUP OP_5 OP_ROLL OP_ADD $y OP_NUMEQUALVERIFY OP_2DROP OP_2DROP OP_1 OP_ELSE OP_1 OP_NUMEQUALVERIFY OP_DUP OP_DUP OP_2 OP_ADD OP_DUP $x OP_NUMEQUAL OP_IF OP_DUP OP_3 OP_PICK OP_ADD OP_2DUP OP_ADD OP_ROT OP_DROP OP_SWAP OP_2DUP OP_LESSTHAN OP_VERIFY OP_DROP OP_ENDIF OP_ROT $y OP_NUMEQUAL OP_NIP OP_NIP OP_ENDIF',
     },
   },
   {

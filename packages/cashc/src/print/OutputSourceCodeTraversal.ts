@@ -61,11 +61,13 @@ export default class OutputSourceCodeTraversal extends AstTraversal {
   visitContract(node: ContractNode): Node {
     this.addOutput(`contract ${node.name}(`, true);
     node.parameters = this.visitCommaList(node.parameters) as ParameterNode[];
+    this.addOutput(')');
     if (node.functionParameters.length > 0) {
-      this.addOutput('\nfunction ');
+      this.addOutput('\nfunction (');
+      node.functionParameters = this.visitCommaList(node.functionParameters) as ParameterNode[];
+      this.addOutput(')');
     }
-    node.functionParameters = this.visitCommaList(node.functionParameters) as ParameterNode[];
-    this.addOutput(') {');
+    this.addOutput(' {');
     this.outputSymbolTable(node.symbolTable);
     this.addOutput('\n');
 

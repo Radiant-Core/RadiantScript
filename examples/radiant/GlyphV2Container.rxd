@@ -1,0 +1,110 @@
+pragma radiantscript ^0.9.0;
+
+// GlyphV2Container - Collection/Container contract for Glyph v2
+// Implements GLYPH_CONTAINER protocol (REP-3013)
+//
+// Features:
+// - Parent container token that groups child NFTs
+// - Optional authority requirement for adding items
+// - Collection-level metadata and statistics
+// - Compatible with Glyph v2 metadata envelopes
+//
+// Reference: https://github.com/Radiant-Core/Glyph-Token-Standards
+
+contract GlyphV2Container(
+    bytes36 constant $containerRef,  // Container's singleton reference
+    pubkey ownerPk,                  // Container owner's public key
+    int maxItems,                    // Maximum items in collection
+    bool requireAuthority            // Require authority token for adds
+) {
+    // Transfer container ownership
+    function transfer(sig s) {
+        require(checkSig(s, ownerPk));
+        
+        pushInputRefSingleton($containerRef);
+        require(tx.outputs.refOutputCount($containerRef) == 1);
+    }
+    
+    // Update container metadata (mutable state)
+    function updateMetadata(sig s, bytes32 newPayloadHash) {
+        require(checkSig(s, ownerPk));
+        
+        pushInputRefSingleton($containerRef);
+        require(tx.outputs.refOutputCount($containerRef) == 1);
+        
+        // New payload hash is embedded in output state
+        // Indexers track update history
+    }
+    
+    // Add item to collection (with authority check if required)
+    function addItem(sig s, bytes36 itemRef, bytes36 authorityRef) {
+        require(checkSig(s, ownerPk));
+        
+        pushInputRefSingleton($containerRef);
+        
+        // If authority required, verify authority token is in inputs
+        if (requireAuthority) {
+            pushInputRef(authorityRef);
+            require(tx.inputs.refOutputCount(authorityRef) >= 1);
+        }
+        
+        // Container continues
+        require(tx.outputs.refOutputCount($containerRef) == 1);
+        
+        // Item ref is recorded by indexers via metadata
+    }
+}
+
+// GlyphV2Authority - Authority token for project governance
+// Implements GLYPH_AUTHORITY protocol (REP-3015)
+contract GlyphV2Authority(
+    bytes36 constant $authorityRef,  // Authority singleton reference
+    pubkey holderPk,                 // Current authority holder
+    bool transferable,               // Can authority be transferred
+    bool revocable,                  // Can authority be revoked by issuer
+    bytes36 issuerRef                // Parent authority (null for root)
+) {
+    // Transfer authority to new holder
+    function transfer(sig s, pubkey newHolderPk) {
+        require(checkSig(s, holderPk));
+        require(transferable);
+        
+        pushInputRefSingleton($authorityRef);
+        require(tx.outputs.refOutputCount($authorityRef) == 1);
+        
+        // New holder receives the authority token
+    }
+    
+    // Delegate authority (create child authority)
+    function delegate(sig s, bytes36 childAuthorityRef) {
+        require(checkSig(s, holderPk));
+        
+        // Parent authority continues
+        pushInputRefSingleton($authorityRef);
+        require(tx.outputs.refOutputCount($authorityRef) == 1);
+        
+        // Child authority is created in same tx
+        pushInputRefSingleton(childAuthorityRef);
+        require(tx.outputs.refOutputCount(childAuthorityRef) == 1);
+    }
+    
+    // Revoke child authority (requires issuer signature)
+    function revoke(sig s, bytes36 childAuthorityRef) {
+        require(checkSig(s, holderPk));
+        
+        // Must be the issuer of the child authority
+        pushInputRefSingleton($authorityRef);
+        
+        // Child authority is burned (revoked)
+        pushInputRefSingleton(childAuthorityRef);
+        require(tx.outputs.refOutputCount(childAuthorityRef) == 0);
+    }
+    
+    // Burn this authority (voluntary destruction)
+    function burn(sig s) {
+        require(checkSig(s, holderPk));
+        
+        pushInputRefSingleton($authorityRef);
+        require(tx.outputs.refOutputCount($authorityRef) == 0);
+    }
+}

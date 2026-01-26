@@ -1,0 +1,101 @@
+pragma radiantscript ^0.9.0;
+
+// GlyphV2FT - Glyph v2 Fungible Token contract
+// Implements the Glyph v2 Token Standard (REP-3001)
+//
+// Features:
+// - Reference-based token tracking with value-sum conservation
+// - Support for token decimals (photon-backed)
+// - Explicit burn mechanism per GLYPH_BURN protocol
+// - Compatible with Glyph v2 metadata envelopes
+//
+// Reference: https://github.com/Radiant-Core/Glyph-Token-Standards
+
+contract GlyphV2FT(
+    bytes36 constant $tokenRef,  // Unique token reference
+    pubkey ownerPk               // Output owner's public key
+) {
+    // Transfer tokens to new outputs
+    // Conservation: input token sum >= output token sum
+    // Difference is implicitly burned (per Glyph v2 spec)
+    function transfer(sig s) {
+        require(checkSig(s, ownerPk));
+        
+        pushInputRef($tokenRef);
+        
+        int inputTokens = tx.inputs.refValueSum($tokenRef);
+        int outputTokens = tx.outputs.refValueSum($tokenRef);
+        
+        // Allow implicit burn (inputs can exceed outputs)
+        require(inputTokens >= outputTokens);
+    }
+    
+    // Explicit burn with verification
+    // Creates burn proof per Glyph v2 GLYPH_BURN protocol
+    function burn(sig s, int burnAmount) {
+        require(checkSig(s, ownerPk));
+        require(burnAmount > 0);
+        
+        pushInputRef($tokenRef);
+        
+        int inputTokens = tx.inputs.refValueSum($tokenRef);
+        int outputTokens = tx.outputs.refValueSum($tokenRef);
+        
+        // Verify exact burn amount
+        require(inputTokens - burnAmount == outputTokens);
+    }
+    
+    // Split tokens across multiple outputs
+    function split(sig s, int[] amounts) {
+        require(checkSig(s, ownerPk));
+        
+        pushInputRef($tokenRef);
+        
+        int inputTokens = tx.inputs.refValueSum($tokenRef);
+        int outputTokens = tx.outputs.refValueSum($tokenRef);
+        
+        // Conservation check
+        require(inputTokens >= outputTokens);
+        
+        // Verify output count matches amounts array
+        int outputCount = tx.outputs.refOutputCount($tokenRef);
+        require(outputCount == amounts.length);
+    }
+}
+
+// GlyphV2FTMint - dMint (Decentralized Minting) contract
+// Implements GLYPH_DMINT protocol for proof-of-work token distribution
+contract GlyphV2FTMint(
+    bytes36 constant $contractRef, // Singleton contract reference
+    bytes36 constant $tokenRef,    // Token reference for minted tokens
+    int maxHeight,                 // Maximum mint height
+    int reward,                    // Tokens per mint
+    bytes32 target,                // POW difficulty target
+    int algoId,                    // Algorithm: 0=SHA256d, 1=Blake3, etc.
+    int daaMode                    // DAA: 0=Fixed, 1=Epoch, 2=ASERT, etc.
+) {
+    // Mint tokens by providing valid proof-of-work
+    function mint(bytes32 nonce, pubkey minerPk) {
+        // Contract continues as singleton
+        pushInputRefSingleton($contractRef);
+        
+        // New tokens created with token reference
+        pushInputRef($tokenRef);
+        
+        // Get current height from contract state
+        int currentHeight = tx.inputs[0].state.height;
+        require(currentHeight < maxHeight);
+        
+        // Verify POW solution
+        bytes preimage = tx.inputs[0].outpoint ++ minerPk ++ nonce;
+        bytes32 hash = sha256(sha256(preimage)); // SHA256d default
+        require(hash < target);
+        
+        // Verify minted amount equals reward
+        int mintedTokens = tx.outputs.refValueSum($tokenRef);
+        require(mintedTokens == reward);
+        
+        // Contract output must exist with updated state
+        require(tx.outputs.refOutputCount($contractRef) == 1);
+    }
+}

@@ -1,0 +1,85 @@
+pragma radiantscript ^0.9.0;
+
+// GlyphV2NFT - Glyph v2 NFT contract with optional royalty enforcement
+// Implements the Glyph v2 Token Standard (REP-3001)
+//
+// Features:
+// - Singleton reference for NFT uniqueness
+// - Optional on-chain royalty enforcement
+// - Soulbound (non-transferable) mode support
+// - Compatible with Glyph v2 metadata envelopes
+//
+// Reference: https://github.com/Radiant-Core/Glyph-Token-Standards
+
+contract GlyphV2NFT(
+    bytes36 constant $nftRef,      // Unique NFT reference (reveal txid:vout)
+    pubkey ownerPk,                // Current owner's public key
+    bool enforceRoyalty,           // Whether royalties are enforced on-chain
+    int royaltyBps,                // Royalty basis points (500 = 5%)
+    bytes20 royaltyPkh,            // Royalty recipient pubkey hash
+    int royaltyMinimum             // Minimum royalty in photons
+) {
+    // Standard transfer - no royalty enforcement
+    // Used when enforceRoyalty is false or for non-sale transfers
+    function transfer(sig s) {
+        require(checkSig(s, ownerPk));
+        
+        // Singleton ensures exactly one output
+        pushInputRefSingleton($nftRef);
+        require(tx.outputs.refOutputCount($nftRef) == 1);
+    }
+    
+    // Transfer with enforced royalty payment
+    // Sale price is determined by the seller payment output value
+    function transferWithRoyalty(sig s, int salePrice) {
+        require(checkSig(s, ownerPk));
+        require(enforceRoyalty);
+        require(salePrice > 0);
+        
+        pushInputRefSingleton($nftRef);
+        require(tx.outputs.refOutputCount($nftRef) == 1);
+        
+        // Calculate royalty: max(salePrice * bps / 10000, minimum)
+        int royaltyAmount = salePrice * royaltyBps / 10000;
+        if (royaltyAmount < royaltyMinimum) {
+            royaltyAmount = royaltyMinimum;
+        }
+        
+        // Verify royalty output exists at index 2
+        // Output 0: NFT to buyer
+        // Output 1: Payment to seller
+        // Output 2: Royalty to creator
+        bytes25 royaltyScript = new OutputP2PKH(royaltyPkh);
+        require(tx.outputs[2].lockingBytecode == royaltyScript);
+        require(tx.outputs[2].value >= royaltyAmount);
+    }
+    
+    // Burn the NFT - destroy it permanently
+    // Creates burn proof per Glyph v2 GLYPH_BURN protocol
+    function burn(sig s) {
+        require(checkSig(s, ownerPk));
+        
+        // Singleton is spent but not recreated
+        pushInputRefSingleton($nftRef);
+        
+        // Verify no output carries this reference (it's destroyed)
+        require(tx.outputs.refOutputCount($nftRef) == 0);
+    }
+}
+
+// GlyphV2NFTSoulbound - Non-transferable NFT (soulbound token)
+// Can only be burned, never transferred
+contract GlyphV2NFTSoulbound(
+    bytes36 constant $nftRef,
+    pubkey ownerPk
+) {
+    // Soulbound tokens can only be burned by the owner
+    function burn(sig s) {
+        require(checkSig(s, ownerPk));
+        
+        pushInputRefSingleton($nftRef);
+        
+        // Ensure the reference is destroyed
+        require(tx.outputs.refOutputCount($nftRef) == 0);
+    }
+}

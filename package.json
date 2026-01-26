@@ -6,6 +6,10 @@
     "packages/cashscript",
     "packages/utils"
   ],
+  "dependencies": {
+    "@radiantblockchain/radiantjs": "github:Radiant-Core/radiantjs",
+    "@radiantblockchain/constants": "github:Radiant-Core/radiantblockchain-constants"
+  },
   "devDependencies": {
     "@jest/reporters": "^29.7.0",
     "@types/jest": "^29.5.12",

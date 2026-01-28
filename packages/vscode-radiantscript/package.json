@@ -1,0 +1,108 @@
+{
+  "name": "radiantscript",
+  "displayName": "RadiantScript",
+  "description": "Language support for RadiantScript (.rxd) - Radiant blockchain smart contracts",
+  "version": "0.1.0",
+  "publisher": "radiant-blockchain",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Radiant-Core/RadiantScript"
+  },
+  "icon": "images/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Linters"
+  ],
+  "keywords": [
+    "radiant",
+    "blockchain",
+    "smart contracts",
+    "radiantscript",
+    "rxd",
+    "glyph"
+  ],
+  "activationEvents": [
+    "onLanguage:radiantscript"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "radiantscript",
+        "aliases": ["RadiantScript", "radiantscript", "rxd"],
+        "extensions": [".rxd", ".cash"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "radiantscript",
+        "scopeName": "source.radiantscript",
+        "path": "./syntaxes/radiantscript.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "radiantscript",
+        "path": "./snippets/radiantscript.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "radiantscript.compile",
+        "title": "RadiantScript: Compile Contract"
+      },
+      {
+        "command": "radiantscript.deploy",
+        "title": "RadiantScript: Deploy Contract"
+      }
+    ],
+    "configuration": {
+      "title": "RadiantScript",
+      "properties": {
+        "radiantscript.compiler.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to rxdc compiler (leave empty for bundled version)"
+        },
+        "radiantscript.network": {
+          "type": "string",
+          "enum": ["mainnet", "testnet"],
+          "default": "testnet",
+          "description": "Default network for deployment"
+        },
+        "radiantscript.electrum.host": {
+          "type": "string",
+          "default": "electrumx.radiant4people.com",
+          "description": "ElectrumX server host"
+        },
+        "radiantscript.electrum.port": {
+          "type": "number",
+          "default": 50012,
+          "description": "ElectrumX server port"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.55.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {}
+}

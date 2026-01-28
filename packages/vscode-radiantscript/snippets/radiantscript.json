@@ -1,0 +1,166 @@
+{
+  "Contract": {
+    "prefix": "contract",
+    "body": [
+      "pragma radiant ^0.7.0;",
+      "",
+      "contract ${1:ContractName}(${2:pubkey owner}) {",
+      "    function ${3:spend}(${4:sig ownerSig}) {",
+      "        require(checkSig(${4:ownerSig}, ${2:owner}));",
+      "    }",
+      "}"
+    ],
+    "description": "Create a new RadiantScript contract"
+  },
+  "Function": {
+    "prefix": "function",
+    "body": [
+      "function ${1:name}(${2:sig s}) {",
+      "    require(${3:checkSig(s, owner)});",
+      "}"
+    ],
+    "description": "Create a new function"
+  },
+  "Require": {
+    "prefix": "require",
+    "body": "require(${1:condition});",
+    "description": "Add a require statement"
+  },
+  "CheckSig": {
+    "prefix": "checksig",
+    "body": "checkSig(${1:signature}, ${2:pubkey})",
+    "description": "Signature verification"
+  },
+  "CheckMultiSig": {
+    "prefix": "checkmultisig",
+    "body": "checkMultiSig([${1:sig1}, ${2:sig2}], [${3:pk1}, ${4:pk2}])",
+    "description": "Multi-signature verification"
+  },
+  "TimeLock": {
+    "prefix": "timelock",
+    "body": [
+      "pragma radiant ^0.7.0;",
+      "",
+      "contract TimeLock(pubkey recipient, int unlockTime) {",
+      "    function claim(sig recipientSig) {",
+      "        require(tx.locktime >= unlockTime);",
+      "        require(checkSig(recipientSig, recipient));",
+      "    }",
+      "}"
+    ],
+    "description": "TimeLock contract template"
+  },
+  "FungibleToken": {
+    "prefix": "ft",
+    "body": [
+      "pragma radiant ^0.7.0;",
+      "",
+      "contract FungibleToken(pubkey mintAuthority) {",
+      "    function transfer(sig ownerSig, pubkey ownerPk) {",
+      "        require(checkSig(ownerSig, ownerPk));",
+      "    }",
+      "",
+      "    function mint(sig authSig) {",
+      "        require(checkSig(authSig, mintAuthority));",
+      "    }",
+      "}"
+    ],
+    "description": "Fungible Token contract template"
+  },
+  "NFT": {
+    "prefix": "nft",
+    "body": [
+      "pragma radiant ^0.7.0;",
+      "",
+      "contract NFT(pubkey creator) {",
+      "    function transfer(sig ownerSig, pubkey ownerPk) {",
+      "        require(checkSig(ownerSig, ownerPk));",
+      "    }",
+      "",
+      "    function burn(sig ownerSig, pubkey ownerPk) {",
+      "        require(checkSig(ownerSig, ownerPk));",
+      "    }",
+      "}"
+    ],
+    "description": "NFT contract template"
+  },
+  "MultiSig": {
+    "prefix": "multisig",
+    "body": [
+      "pragma radiant ^0.7.0;",
+      "",
+      "contract MultiSig(pubkey pk1, pubkey pk2, pubkey pk3, int threshold) {",
+      "    function spend(sig s1, sig s2) {",
+      "        require(checkMultiSig([s1, s2], [pk1, pk2, pk3]));",
+      "    }",
+      "}"
+    ],
+    "description": "Multi-signature contract template"
+  },
+  "dMint": {
+    "prefix": "dmint",
+    "body": [
+      "pragma radiant ^0.7.0;",
+      "",
+      "contract dMintToken(bytes32 difficultyTarget) {",
+      "    function mint(bytes nonce) {",
+      "        bytes32 hash = sha256(sha256(this.activeBytecode + nonce));",
+      "        require(hash < difficultyTarget);",
+      "    }",
+      "",
+      "    function transfer(sig ownerSig, pubkey ownerPk) {",
+      "        require(checkSig(ownerSig, ownerPk));",
+      "    }",
+      "}"
+    ],
+    "description": "dMint (proof-of-work) token contract template"
+  },
+  "P2PKH": {
+    "prefix": "p2pkh",
+    "body": [
+      "pragma radiant ^0.7.0;",
+      "",
+      "contract P2PKH(pubkey owner) {",
+      "    function spend(sig ownerSig) {",
+      "        require(checkSig(ownerSig, owner));",
+      "    }",
+      "}"
+    ],
+    "description": "Pay-to-Public-Key-Hash contract template"
+  },
+  "Hash256": {
+    "prefix": "hash256",
+    "body": "hash256(${1:data})",
+    "description": "Double SHA256 hash"
+  },
+  "Hash160": {
+    "prefix": "hash160",
+    "body": "hash160(${1:data})",
+    "description": "RIPEMD160(SHA256(data))"
+  },
+  "SHA512_256": {
+    "prefix": "sha512_256",
+    "body": "sha512_256(${1:data})",
+    "description": "SHA512/256 hash (Radiant-specific)"
+  },
+  "If Statement": {
+    "prefix": "if",
+    "body": [
+      "if (${1:condition}) {",
+      "    ${2:// body}",
+      "}"
+    ],
+    "description": "If statement"
+  },
+  "If Else Statement": {
+    "prefix": "ifelse",
+    "body": [
+      "if (${1:condition}) {",
+      "    ${2:// if body}",
+      "} else {",
+      "    ${3:// else body}",
+      "}"
+    ],
+    "description": "If-else statement"
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "RadiantScript",
+  "scopeName": "source.radiantscript",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#pragma" },
+    { "include": "#contract" },
+    { "include": "#function" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#constants" },
+    { "include": "#operators" },
+    { "include": "#strings" },
+    { "include": "#numbers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.radiantscript",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.radiantscript",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "pragma": {
+      "patterns": [
+        {
+          "name": "meta.pragma.radiantscript",
+          "match": "^\\s*(pragma)\\s+(radiant)\\s+([^;]+)",
+          "captures": {
+            "1": { "name": "keyword.control.pragma.radiantscript" },
+            "2": { "name": "keyword.other.radiant.radiantscript" },
+            "3": { "name": "string.unquoted.version.radiantscript" }
+          }
+        }
+      ]
+    },
+    "contract": {
+      "patterns": [
+        {
+          "name": "meta.contract.radiantscript",
+          "begin": "\\b(contract)\\s+([A-Z][a-zA-Z0-9_]*)\\s*\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.contract.radiantscript" },
+            "2": { "name": "entity.name.type.contract.radiantscript" }
+          },
+          "patterns": [
+            { "include": "#types" },
+            { "include": "#comments" },
+            {
+              "name": "variable.parameter.radiantscript",
+              "match": "\\b[a-z][a-zA-Z0-9_]*\\b"
+            }
+          ]
+        }
+      ]
+    },
+    "function": {
+      "patterns": [
+        {
+          "name": "meta.function.radiantscript",
+          "begin": "\\b(function)\\s+([a-z][a-zA-Z0-9_]*)\\s*\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.function.radiantscript" },
+            "2": { "name": "entity.name.function.radiantscript" }
+          },
+          "patterns": [
+            { "include": "#types" },
+            { "include": "#comments" },
+            {
+              "name": "variable.parameter.radiantscript",
+              "match": "\\b[a-z][a-zA-Z0-9_]*\\b"
+            }
+          ]
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.radiantscript",
+          "match": "\\b(if|else|require|return|new)\\b"
+        },
+        {
+          "name": "keyword.declaration.radiantscript",
+          "match": "\\b(contract|function|pragma)\\b"
+        },
+        {
+          "name": "keyword.other.radiantscript",
+          "match": "\\b(this|tx|activeBytecode|activeValue|activeBytecode)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.radiantscript",
+          "match": "\\b(int|bool|string|bytes|bytes1|bytes2|bytes4|bytes8|bytes20|bytes32|pubkey|sig|datasig)\\b"
+        },
+        {
+          "name": "storage.type.array.radiantscript",
+          "match": "\\b(int|bool|bytes)\\s*\\[\\s*\\]"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.radiantscript",
+          "match": "\\b(true|false)\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.radiantscript",
+          "match": "(==|!=|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.arithmetic.radiantscript",
+          "match": "(\\+|-|\\*|/|%)"
+        },
+        {
+          "name": "keyword.operator.logical.radiantscript",
+          "match": "(&&|\\|\\||!)"
+        },
+        {
+          "name": "keyword.operator.bitwise.radiantscript",
+          "match": "(&|\\||\\^|~|<<|>>)"
+        },
+        {
+          "name": "keyword.operator.assignment.radiantscript",
+          "match": "="
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.radiantscript",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.radiantscript",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.radiantscript",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.radiantscript",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.hex.radiantscript",
+          "match": "0x[0-9a-fA-F]+"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.radiantscript",
+          "match": "\\b[0-9]+\\b"
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "name": "support.function.radiantscript",
+          "match": "\\b(checkSig|checkMultiSig|checkDataSig|sha256|sha512|sha512_256|hash256|hash160|ripemd160|abs|min|max|within|size|split|reverse|checkLockTime|checkSequence)\\b"
+        },
+        {
+          "name": "support.function.introspection.radiantscript",
+          "match": "\\b(tx\\.(version|locktime|inputs|outputs|age)|this\\.(activeBytecode|activeValue|activeInputIndex))\\b"
+        }
+      ]
+    }
+  }
+}

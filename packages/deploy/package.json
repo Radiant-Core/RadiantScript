@@ -1,0 +1,44 @@
+{
+  "name": "@radiantscript/deploy",
+  "version": "0.1.0",
+  "description": "One-click contract deployment CLI for RadiantScript",
+  "keywords": [
+    "radiant",
+    "radiantscript",
+    "deploy",
+    "smart contracts",
+    "cli"
+  ],
+  "homepage": "https://github.com/Radiant-Core/RadiantScript",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Radiant-Core/RadiantScript.git"
+  },
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "rxd-deploy": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf ./dist",
+    "lint": "eslint . --ext .ts --ignore-path ../../.eslintignore",
+    "test": "jest --config=../../jest.config.js packages/deploy"
+  },
+  "dependencies": {
+    "@radiantblockchain/constants": "github:Radiant-Core/radiantblockchain-constants",
+    "@radiantblockchain/radiantjs": "github:Radiant-Core/radiantjs",
+    "chalk": "^4.1.2",
+    "commander": "^12.0.0",
+    "inquirer": "^8.2.6",
+    "ora": "^5.4.1",
+    "ws-electrumx-client": "^1.0.5"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^8.2.10",
+    "@types/node": "^20.10.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.3.3"
+  }
+}

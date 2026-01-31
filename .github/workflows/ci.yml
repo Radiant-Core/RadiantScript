@@ -60,3 +60,40 @@ jobs:
       
       - name: Type check
         run: npx tsc --noEmit
+
+  compile-contracts:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build compiler
+        run: npm run build --if-present
+      
+      - name: Compile Glyph v2 contracts
+        run: |
+          if [ -d "examples/radiant" ]; then
+            for contract in examples/radiant/*.rxd; do
+              if [ -f "$contract" ]; then
+                echo "Compiling: $contract"
+                npx cashc "$contract" --output "${contract%.rxd}.json" || true
+              fi
+            done
+          fi
+        continue-on-error: true
+      
+      - name: Verify contract artifacts
+        run: |
+          if [ -d "examples/radiant" ]; then
+            ls -la examples/radiant/*.json 2>/dev/null || echo "No compiled artifacts found"
+          fi

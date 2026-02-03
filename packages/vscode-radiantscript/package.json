@@ -25,10 +25,7 @@
     "rxd",
     "glyph"
   ],
-  "activationEvents": [
-    "onLanguage:radiantscript"
-  ],
-  "main": "./out/extension.js",
+    "main": "./out/extension.js",
   "contributes": {
     "languages": [
       {

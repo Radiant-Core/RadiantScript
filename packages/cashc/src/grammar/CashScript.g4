@@ -223,6 +223,9 @@ NullaryOp
     | 'tx.outputs.length'
     | 'tx.version'
     | 'tx.locktime'
+    | 'tx.state.txId'
+    | 'tx.state.inputSum'
+    | 'tx.state.outputSum'
     ;
 
 Identifier

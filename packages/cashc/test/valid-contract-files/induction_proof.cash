@@ -1,0 +1,30 @@
+pragma radiantscript ^0.1.0;
+
+// Test contract for tx.state nullary operators and induction proof patterns
+contract InductionProofTest(
+    bytes36 constant $nftRef,
+    pubkey ownerPk
+) {
+    return {
+        transferWithStateCheck(sig s, int maxFee) {
+            require(checkSig(s, ownerPk));
+
+            pushInputRefSingleton($nftRef);
+            require(tx.outputs.refOutputCount($nftRef) == 1);
+
+            // Code-continuity induction: verify parent had same contract code
+            bytes myCodeScript = tx.inputs[this.activeInputIndex].codeScript;
+            bytes32 myCodeHash = hash256(myCodeScript);
+            require(tx.outputs.codeScriptCount(myCodeHash) >= 1);
+
+            // tx.state operators (OP_PUSH_TX_STATE)
+            bytes32 myTxId = tx.state.txId;
+            require(myTxId != 0x0000000000000000000000000000000000000000000000000000000000000000);
+            int totalIn = tx.state.inputSum;
+            int totalOut = tx.state.outputSum;
+            int fee = totalIn - totalOut;
+            require(fee >= 0);
+            require(fee <= maxFee);
+        }
+    }
+}

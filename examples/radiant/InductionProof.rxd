@@ -1,0 +1,144 @@
+pragma radiantscript ^0.9.0;
+
+// InductionProof - Demonstrates induction proof techniques on Radiant
+//
+// Radiant provides two independent methods for induction proofs:
+//   Method 1: Reference-based (OP_PUSHINPUTREF family) - O(1) constant time
+//   Method 2: TxId v3 preimage embedding - general-purpose mathematical induction
+//
+// This contract demonstrates both methods combined with OP_PUSH_TX_STATE
+// for accessing the current transaction's identity and value sums.
+//
+// TxId v3 Preimage Layout (112 bytes):
+//   Bytes  0-3:   nVersion (4B LE)
+//   Bytes  4-7:   nTotalInputs (4B LE)
+//   Bytes  8-39:  hashPrevoutInputs (32B)
+//   Bytes 40-71:  hashSequence (32B)
+//   Bytes 72-75:  nTotalOutputs (4B LE)
+//   Bytes 76-107: hashOutputHashes (32B)
+//   Bytes 108-111: nLocktime (4B LE)
+//
+// When nVersion == 3, the txid is hash256(preimage) instead of hash256(raw_tx).
+// This enables compact induction proofs without exponential size blowup.
+
+// InductionNFT - NFT with provenance verification via induction
+// Verifies that the parent transaction had the same contract code,
+// creating an unbroken chain of verified logic from genesis to present.
+contract InductionNFT(
+    bytes36 constant $nftRef,  // Unique NFT reference
+    pubkey ownerPk             // Current owner's public key
+) {
+    // Transfer with code-continuity induction proof
+    // Verifies that the parent UTXO used the same contract code,
+    // guaranteeing the entire chain of ownership followed the same rules.
+    function transfer(sig s) {
+        require(checkSig(s, ownerPk));
+
+        // Method 1: Reference-based induction
+        // The reference chain guarantees provenance from genesis
+        pushInputRefSingleton($nftRef);
+        require(tx.outputs.refOutputCount($nftRef) == 1);
+
+        // Method 1 + introspection: Code-continuity induction
+        // Verify the parent UTXO had the same contract code as this output.
+        // Since the parent also verified ITS parent had the same code,
+        // this is the inductive step P(k) -> P(k+1).
+        bytes myCodeScript = tx.inputs[this.activeInputIndex].codeScript;
+        bytes myCodeHash = hash256(myCodeScript);
+        int sameCodeOutputs = tx.outputs.codeScriptCount(myCodeHash);
+        require(sameCodeOutputs >= 1);
+    }
+
+    // Transfer with fee verification using tx.state introspection
+    // Demonstrates OP_PUSH_TX_STATE for accessing transaction-level data
+    function transferWithFeeCheck(sig s, int maxFee) {
+        require(checkSig(s, ownerPk));
+
+        pushInputRefSingleton($nftRef);
+        require(tx.outputs.refOutputCount($nftRef) == 1);
+
+        // Use tx.state to verify fee bounds
+        // tx.state.inputSum and tx.state.outputSum access OP_PUSH_TX_STATE
+        int totalIn = tx.state.inputSum;
+        int totalOut = tx.state.outputSum;
+        int fee = totalIn - totalOut;
+        require(fee >= 0);
+        require(fee <= maxFee);
+    }
+}
+
+// InductionV3NFT - NFT using TxId v3 preimage for mathematical induction
+// Demonstrates Method 2: embedding the parent's v3 preimage to verify
+// the parent transaction structure without exponential size growth.
+contract InductionV3NFT(
+    bytes36 constant $nftRef,
+    pubkey ownerPk
+) {
+    // Transfer with v3 preimage induction proof
+    // The caller provides the parent transaction's v3 preimage (112 bytes)
+    // in the unlocking script. The contract verifies it matches the parent.
+    function transferWithProof(
+        sig s,
+        bytes112 parentPreimage  // TxId v3 preimage of parent transaction
+    ) {
+        require(checkSig(s, ownerPk));
+
+        pushInputRefSingleton($nftRef);
+        require(tx.outputs.refOutputCount($nftRef) == 1);
+
+        // Verify parentPreimage matches the input being spent:
+        // hash256(parentPreimage) must equal the parent's txid
+        bytes32 derivedParentTxId = hash256(parentPreimage);
+        bytes32 actualParentTxId = tx.inputs[this.activeInputIndex].outpointTransactionHash;
+        require(derivedParentTxId == actualParentTxId);
+
+        // Extract fields from the v3 preimage for structural verification
+        // nVersion: first 4 bytes
+        bytes4 parentVersion, bytes108 rest1 = parentPreimage.split(4);
+        // nTotalInputs: next 4 bytes
+        bytes4 parentInputCount, bytes104 rest2 = rest1.split(4);
+        // hashPrevoutInputs: next 32 bytes (skip)
+        bytes32 parentPrevouts, bytes72 rest3 = rest2.split(32);
+        // hashSequence: next 32 bytes (skip)
+        bytes32 parentSequence, bytes40 rest4 = rest3.split(32);
+        // nTotalOutputs: next 4 bytes
+        bytes4 parentOutputCount, bytes36 rest5 = rest4.split(4);
+        // hashOutputHashes: next 32 bytes
+        bytes32 parentOutputHashes, bytes4 parentLocktime = rest5.split(32);
+
+        // Verify parent was a v3 transaction
+        require(int(parentVersion) == 3);
+
+        // Verify parent had at least 1 input and 1 output
+        require(int(parentInputCount) >= 1);
+        require(int(parentOutputCount) >= 1);
+
+        // Ensure the output carries the same contract code
+        bytes myCodeScript = tx.inputs[this.activeInputIndex].codeScript;
+        bytes myCodeHash = hash256(myCodeScript);
+        require(tx.outputs.codeScriptCount(myCodeHash) >= 1);
+    }
+}
+
+// ValueConservationToken - Fungible token demonstrating tx.state for accounting
+// Uses tx.state.inputSum and tx.state.outputSum for fee-aware conservation
+contract ValueConservationToken(
+    bytes36 constant $tokenRef,
+    pubkey ownerPk
+) {
+    function transfer(sig s) {
+        require(checkSig(s, ownerPk));
+
+        pushInputRef($tokenRef);
+
+        // Standard conservation: token value in == token value out
+        int inputTokens = tx.inputs.refValueSum($tokenRef);
+        int outputTokens = tx.outputs.refValueSum($tokenRef);
+        require(inputTokens == outputTokens);
+
+        // Additional check using tx.state: verify total fee is reasonable
+        int fee = tx.state.inputSum - tx.state.outputSum;
+        require(fee >= 0);
+        require(fee <= 1000000);  // Max 0.01 RXD fee
+    }
+}

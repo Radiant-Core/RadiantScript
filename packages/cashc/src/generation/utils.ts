@@ -48,6 +48,8 @@ export function compileGlobalFunction(fn: GlobalFunction): Script {
     [GlobalFunction.WITHIN]: [Op.OP_WITHIN],
     [GlobalFunction.SHA512_256]: [RadiantOp.OP_SHA512_256],
     [GlobalFunction.HASH512_256]: [RadiantOp.OP_HASH512_256],
+    [GlobalFunction.BLAKE3]: [RadiantOp.OP_BLAKE3],
+    [GlobalFunction.K12]: [RadiantOp.OP_K12],
     [GlobalFunction.CODESCRIPTHASHOUTPUTCOUNT_OUTPUTS]:
       [RadiantOp.OP_CODESCRIPTHASHOUTPUTCOUNT_OUTPUTS],
     [GlobalFunction.CODESCRIPTHASHVALUESUM_OUTPUTS]: [RadiantOp.OP_CODESCRIPTHASHVALUESUM_OUTPUTS],
@@ -141,6 +143,9 @@ export function compileNullaryOp(op: NullaryOperator): Op[] {
     [NullaryOperator.OUTPUT_COUNT]: [IntrospectionOp.OP_TXOUTPUTCOUNT],
     [NullaryOperator.VERSION]: [IntrospectionOp.OP_TXVERSION],
     [NullaryOperator.LOCKTIME]: [IntrospectionOp.OP_TXLOCKTIME],
+    [NullaryOperator.STATE_TXID]: [Op.OP_0, RadiantOp.OP_PUSH_TX_STATE],
+    [NullaryOperator.STATE_INPUT_SUM]: [Op.OP_1, RadiantOp.OP_PUSH_TX_STATE],
+    [NullaryOperator.STATE_OUTPUT_SUM]: [Op.OP_2, RadiantOp.OP_PUSH_TX_STATE],
   };
 
   return mapping[op];

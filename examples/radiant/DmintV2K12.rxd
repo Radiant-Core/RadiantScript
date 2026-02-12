@@ -1,0 +1,54 @@
+// dMint V2 Contract: KangarooTwelve (K12) PoW with On-Chain DAA (ASERT-lite)
+//
+// Identical to DmintV2Blake3 but uses k12() instead of blake3() for PoW.
+// K12 is based on Keccak-p[1600,12] and is faster than SHA-3 for short inputs.
+//
+// State layout (before OP_STATESEPARATOR):
+//   <height:4B> d8<contractRef:36B> d0<tokenRef:36B>
+//   <maxHeight> <reward> <target> <lastTime:4B> <targetTime>
+//
+// Requires: Hard Fork V2 (OP_K12 = 0xef, OP_LSHIFT = 0x98, OP_RSHIFT = 0x99)
+
+pragma radiant ^2.0.0;
+
+contract DmintV2K12(
+    bytes36 contractRef,
+    bytes36 tokenRef,
+    int maxHeight,
+    int reward,
+    int targetTime
+) {
+    function mint(
+        bytes preimage,
+        bytes8 nonce,
+        int newHeight,
+        int newTarget,
+        int newTime
+    ) {
+        // 1. Validate PoW: k12(preimage || nonce) < current target
+        bytes32 hash = k12(preimage + nonce);
+        require(hash < bytes32(tx.state.target));
+
+        // 2. Validate state transition
+        require(newHeight == tx.state.height + 1);
+        require(newHeight <= maxHeight);
+
+        // 3. On-chain DAA (ASERT-lite using bit shifts)
+        int timeDelta = newTime - tx.state.lastTime;
+        int shiftAmount = (timeDelta - targetTime) / targetTime;
+        int clampedShift = min(max(shiftAmount, -4), 4);
+
+        int adjustedTarget;
+        if (clampedShift > 0) {
+            adjustedTarget = tx.state.target << clampedShift;
+        } else if (clampedShift < 0) {
+            adjustedTarget = tx.state.target >> (0 - clampedShift);
+        } else {
+            adjustedTarget = tx.state.target;
+        }
+        require(newTarget == adjustedTarget);
+
+        // 4. Verify output preserves contract
+        require(tx.outputs[this.activeInputIndex].value >= reward);
+    }
+}

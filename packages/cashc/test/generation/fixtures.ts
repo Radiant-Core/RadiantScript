@@ -714,4 +714,23 @@ export const fixtures: Fixture[] = [
       asm: 'OP_DUP OP_HASH160 $PKH OP_EQUALVERIFY OP_CHECKSIGVERIFY OP_STATESEPARATOR OP_PUSHINPUTREF $REF OP_INPUTINDEX OP_CODESCRIPTBYTECODE_UTXO OP_HASH256 OP_DUP OP_CODESCRIPTHASHOUTPUTCOUNT_OUTPUTS OP_ROT OP_REFOUTPUTCOUNT_OUTPUTS OP_NUMEQUALVERIFY OP_DUP OP_CODESCRIPTHASHVALUESUM_UTXOS OP_SWAP OP_CODESCRIPTHASHVALUESUM_OUTPUTS OP_NUMEQUAL',
     },
   },
+  {
+    fn: 'induction_proof.cash',
+    artifact: {
+      version: 9,
+      compilerVersion: 'rxdc 0.1.0',
+      contract: 'InductionProofTest',
+      abi: [
+        {
+          type: 'function', index: 0, name: 'transferWithStateCheck',
+          params: [{ name: 's', type: 'Sig' }, { name: 'maxFee', type: 'int' }],
+        },
+        {
+          type: 'constructor',
+          params: [{ name: 'nftRef', type: 'bytes' }, { name: 'ownerPk', type: 'PubKey' }],
+        },
+      ],
+      asm: 'OP_SWAP $ownerPk OP_CHECKSIGVERIFY OP_PUSHINPUTREFSINGLETON $nftRef OP_DROP $nftRef OP_REFOUTPUTCOUNT_OUTPUTS OP_1 OP_NUMEQUALVERIFY OP_INPUTINDEX OP_CODESCRIPTBYTECODE_UTXO OP_HASH256 OP_CODESCRIPTHASHOUTPUTCOUNT_OUTPUTS OP_1 OP_GREATERTHANOREQUAL OP_VERIFY OP_0 OP_PUSH_TX_STATE 0000000000000000000000000000000000000000000000000000000000000000 OP_EQUAL OP_NOT OP_VERIFY OP_1 OP_PUSH_TX_STATE OP_2 OP_PUSH_TX_STATE OP_SUB OP_DUP OP_0 OP_GREATERTHANOREQUAL OP_VERIFY OP_GREATERTHANOREQUAL',
+    },
+  },
 ];

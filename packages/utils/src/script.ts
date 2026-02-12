@@ -97,6 +97,10 @@ export enum RadiantOp {
   OP_STATESCRIPTBYTECODE_UTXO = 0xeb,
   OP_STATESCRIPTBYTECODE_OUTPUT = 0xec,
   OP_PUSH_TX_STATE = 0xed,
+
+  // Glyph v2 dMint hash opcodes (Hard Fork V2)
+  OP_BLAKE3 = 0xee,
+  OP_K12 = 0xef,
 }
 
 const radiantOpMapping: any = Object.fromEntries(Object.entries(RadiantOp).map(([k, v]) => ([k, `OP_UNKNOWN${v}`])));

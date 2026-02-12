@@ -5,6 +5,9 @@ export enum NullaryOperator {
   OUTPUT_COUNT = 'tx.outputs.length',
   VERSION = 'tx.version',
   LOCKTIME = 'tx.locktime',
+  STATE_TXID = 'tx.state.txId',
+  STATE_INPUT_SUM = 'tx.state.inputSum',
+  STATE_OUTPUT_SUM = 'tx.state.outputSum',
 }
 
 export enum UnaryOperator {

@@ -5,6 +5,8 @@ This project is in development. Language grammar is likely to change. Any contra
 
 RadiantScript is a fork of CashScript with support for Radiant opcodes. It is a high-level language that allows you to write Radiant smart contracts in a straightforward and familiar way.
 
+> **V2 Hard Fork (Radiant Core 2.1, Block 410,000):** RadiantScript includes `blake3()` and `k12()` compiler globals for the new OP_BLAKE3 and OP_K12 hash opcodes. Bitwise shift operators (`<<`, `>>`) compile to OP_LSHIFT/OP_RSHIFT. These opcodes activate at the V2 hard fork height.
+
 ## The RadiantScript Compiler
 RadiantScript features a compiler as a standalone command line tool, called `rxdc`. It compiles `.rxd` files into `.json` artifact files usable by rad-scryptlib. The `rxdc` package can also be imported inside JavaScript files to compile `.rxd` files without using the command line tool.
 

@@ -302,10 +302,15 @@ export default class TypeCheckTraversal extends AstTraversal {
       case NullaryOperator.OUTPUT_COUNT:
       case NullaryOperator.VERSION:
       case NullaryOperator.LOCKTIME:
+      case NullaryOperator.STATE_INPUT_SUM:
+      case NullaryOperator.STATE_OUTPUT_SUM:
         node.type = PrimitiveType.INT;
         return node;
       case NullaryOperator.BYTECODE:
         node.type = new BytesType();
+        return node;
+      case NullaryOperator.STATE_TXID:
+        node.type = new BytesType(32);
         return node;
       default:
         return node;

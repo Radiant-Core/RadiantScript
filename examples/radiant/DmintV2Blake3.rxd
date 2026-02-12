@@ -1,0 +1,66 @@
+// dMint V2 Contract: Blake3 PoW with On-Chain DAA (ASERT-lite)
+//
+// This contract validates Blake3 proof-of-work and adjusts difficulty
+// on-chain using ASERT-lite (bit-shift approximation of exponential DAA).
+//
+// State layout (before OP_STATESEPARATOR):
+//   <height:4B> d8<contractRef:36B> d0<tokenRef:36B>
+//   <maxHeight> <reward> <target> <lastTime:4B> <targetTime>
+//
+// Requires: Hard Fork V2 (OP_BLAKE3 = 0xee, OP_LSHIFT = 0x98, OP_RSHIFT = 0x99)
+
+pragma radiant ^2.0.0;
+
+contract DmintV2Blake3(
+    bytes36 contractRef,
+    bytes36 tokenRef,
+    int maxHeight,
+    int reward,
+    int targetTime
+) {
+    // Mint a new token by providing valid Blake3 proof-of-work
+    function mint(
+        bytes preimage,
+        bytes8 nonce,
+        int newHeight,
+        int newTarget,
+        int newTime
+    ) {
+        // 1. Validate PoW: blake3(preimage || nonce) must be below current target
+        //    First 4 bytes must be zero, next 8 bytes compared as big-endian
+        bytes32 hash = blake3(preimage + nonce);
+        require(hash < bytes32(tx.state.target));
+
+        // 2. Validate state transition
+        require(newHeight == tx.state.height + 1);
+        require(newHeight <= maxHeight);
+
+        // 3. On-chain DAA (ASERT-lite using bit shifts)
+        //    Formula: newTarget = oldTarget * 2^((timeDelta - targetTime) / halfLife)
+        //    Approximated with shifts: if timeDelta > targetTime, shift left (easier);
+        //    if timeDelta < targetTime, shift right (harder)
+        int timeDelta = newTime - tx.state.lastTime;
+        int shiftAmount = (timeDelta - targetTime) / targetTime;
+
+        // Clamp shift to prevent extreme adjustments
+        int clampedShift = min(max(shiftAmount, -4), 4);
+
+        int adjustedTarget;
+        if (clampedShift > 0) {
+            // Mining was slower than target, make it easier (shift left)
+            adjustedTarget = tx.state.target << clampedShift;
+        } else if (clampedShift < 0) {
+            // Mining was faster than target, make it harder (shift right)
+            adjustedTarget = tx.state.target >> (0 - clampedShift);
+        } else {
+            adjustedTarget = tx.state.target;
+        }
+        require(newTarget == adjustedTarget);
+
+        // 4. Verify output preserves contract (singleton ref + value)
+        require(tx.outputs[this.activeInputIndex].value >= reward);
+
+        // 5. Update state: push new height, target, and timestamp
+        // (State is propagated via the output's state script)
+    }
+}

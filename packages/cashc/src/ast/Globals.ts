@@ -29,6 +29,8 @@ export enum GlobalFunction {
   CHECKDATASIG = 'checkDataSig',
   SHA512_256 = 'sha512_256',
   HASH512_256 = 'hash512_256',
+  BLAKE3 = 'blake3',
+  K12 = 'k12',
   REFHASHVALUESUM_UTXOS = 'tx.inputs.refHashValueSum',
   REFHASHVALUESUM_OUTPUTS = 'tx.outputs.refHashValueSum',
   REFTYPE_UTXO = 'tx.inputs.refType',
@@ -126,6 +128,12 @@ GLOBAL_SYMBOL_TABLE.set(
 );
 GLOBAL_SYMBOL_TABLE.set(
   Symbol.function(GlobalFunction.HASH512_256, new BytesType(32), [PrimitiveType.ANY]),
+);
+GLOBAL_SYMBOL_TABLE.set(
+  Symbol.function(GlobalFunction.BLAKE3, new BytesType(32), [PrimitiveType.ANY]),
+);
+GLOBAL_SYMBOL_TABLE.set(
+  Symbol.function(GlobalFunction.K12, new BytesType(32), [PrimitiveType.ANY]),
 );
 GLOBAL_SYMBOL_TABLE.set(Symbol.function(
   GlobalFunction.REFHASHVALUESUM_UTXOS, PrimitiveType.INT, [new BytesType(32)],

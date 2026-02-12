@@ -12,6 +12,7 @@ Comprehensive guides for developing smart contracts with RadiantScript.
 - [Reference-Based Tokens](reference-tokens.md) - Using `pushInputRef` for fungible and non-fungible tokens
 - [State Management](state-management.md) - Working with `stateSeparator` and persistent state
 - [Introspection](introspection.md) - Accessing transaction data in contracts
+- [Induction Proofs](induction-proofs.md) - Reference-based and TxId v3 induction proofs with `tx.state.*`
 
 ## Development Tools
 

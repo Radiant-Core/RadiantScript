@@ -1,0 +1,19 @@
+pragma radiantscript ^0.1.0;
+
+contract ShiftOps(int x, int y) {
+    return {
+        leftShift() {
+            int result = x << y;
+            require(result == 8);
+        },
+        rightShift() {
+            int result = x >> y;
+            require(result == 2);
+        },
+        combined() {
+            int shifted = x << 3;
+            int back = shifted >> 1;
+            require(back > 0);
+        }
+    }
+}

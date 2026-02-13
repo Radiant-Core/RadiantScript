@@ -733,4 +733,27 @@ export const fixtures: Fixture[] = [
       asm: 'OP_SWAP $ownerPk OP_CHECKSIGVERIFY OP_PUSHINPUTREFSINGLETON $nftRef OP_DROP $nftRef OP_REFOUTPUTCOUNT_OUTPUTS OP_1 OP_NUMEQUALVERIFY OP_INPUTINDEX OP_CODESCRIPTBYTECODE_UTXO OP_HASH256 OP_CODESCRIPTHASHOUTPUTCOUNT_OUTPUTS OP_1 OP_GREATERTHANOREQUAL OP_VERIFY OP_0 OP_PUSH_TX_STATE 0000000000000000000000000000000000000000000000000000000000000000 OP_EQUAL OP_NOT OP_VERIFY OP_1 OP_PUSH_TX_STATE OP_2 OP_PUSH_TX_STATE OP_SUB OP_DUP OP_0 OP_GREATERTHANOREQUAL OP_VERIFY OP_GREATERTHANOREQUAL',
     },
   },
+  {
+    fn: 'shift_ops.cash',
+    artifact: {
+      version: 9,
+      compilerVersion: 'rxdc 0.1.0',
+      contract: 'ShiftOps',
+      abi: [
+        {
+          type: 'function', index: 0, name: 'leftShift', params: [],
+        },
+        {
+          type: 'function', index: 1, name: 'rightShift', params: [],
+        },
+        {
+          type: 'function', index: 2, name: 'combined', params: [],
+        },
+        {
+          type: 'constructor', params: [{ name: 'x', type: 'int' }, { name: 'y', type: 'int' }],
+        },
+      ],
+      asm: 'OP_DUP OP_0 OP_NUMEQUAL OP_IF $x $y OP_LSHIFT OP_8 OP_NUMEQUAL OP_NIP OP_ELSE OP_DUP OP_1 OP_NUMEQUAL OP_IF $x $y OP_RSHIFT OP_2 OP_NUMEQUAL OP_NIP OP_ELSE OP_2 OP_NUMEQUALVERIFY $x OP_3 OP_LSHIFT OP_1 OP_RSHIFT OP_0 OP_GREATERTHAN OP_ENDIF OP_ENDIF',
+    },
+  },
 ];

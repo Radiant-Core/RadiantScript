@@ -200,6 +200,8 @@ export default class TypeCheckTraversal extends AstTraversal {
       case BinaryOperator.DIV:
       case BinaryOperator.MOD:
       case BinaryOperator.MINUS:
+      case BinaryOperator.LSHIFT:
+      case BinaryOperator.RSHIFT:
         expectInt(node, resType);
         node.type = resType;
         return node;

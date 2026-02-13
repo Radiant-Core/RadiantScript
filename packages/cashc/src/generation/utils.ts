@@ -94,6 +94,8 @@ export function compileBinaryOp(op: BinaryOperator, numeric: boolean = false): S
     [BinaryOperator.BIT_AND]: [Op.OP_AND],
     [BinaryOperator.BIT_OR]: [Op.OP_OR],
     [BinaryOperator.BIT_XOR]: [Op.OP_XOR],
+    [BinaryOperator.LSHIFT]: [Op.OP_LSHIFT],
+    [BinaryOperator.RSHIFT]: [Op.OP_RSHIFT],
     [BinaryOperator.SPLIT]: [Op.OP_SPLIT],
   };
 

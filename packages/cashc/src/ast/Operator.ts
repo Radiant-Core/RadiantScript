@@ -50,6 +50,8 @@ export enum BinaryOperator {
   BIT_AND = '&',
   BIT_XOR = '^',
   BIT_OR = '|',
+  LSHIFT = '<<',
+  RSHIFT = '>>',
   AND = '&&',
   OR = '||',
   SPLIT = '.split',

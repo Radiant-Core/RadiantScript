@@ -7,7 +7,7 @@ import {
   PrimitiveType,
   Script,
   Type,
-} from '@radiantscript/utils';
+} from '@cashscript/utils';
 import { UnaryOperator, BinaryOperator, NullaryOperator } from '../ast/Operator.js';
 import { GlobalFunction, PushRefOp, TimeOp } from '../ast/Globals.js';
 
@@ -46,6 +46,8 @@ export function compileGlobalFunction(fn: GlobalFunction): Script {
     [GlobalFunction.HASH160]: [Op.OP_HASH160],
     [GlobalFunction.HASH256]: [Op.OP_HASH256],
     [GlobalFunction.WITHIN]: [Op.OP_WITHIN],
+    [GlobalFunction.BLAKE3]: [Op.OP_BLAKE3],
+    [GlobalFunction.K12]: [Op.OP_K12],
     [GlobalFunction.SHA512_256]: [RadiantOp.OP_SHA512_256],
     [GlobalFunction.HASH512_256]: [RadiantOp.OP_HASH512_256],
     [GlobalFunction.CODESCRIPTHASHOUTPUTCOUNT_OUTPUTS]:
@@ -65,10 +67,15 @@ export function compileGlobalFunction(fn: GlobalFunction): Script {
     [GlobalFunction.REFOUTPUTCOUNTZEROVALUED_OUTPUTS]:
       [RadiantOp.OP_REFOUTPUTCOUNTZEROVALUED_OUTPUTS],
     [GlobalFunction.CODESCRIPTHASHVALUESUM_UTXOS]: [RadiantOp.OP_CODESCRIPTHASHVALUESUM_UTXOS],
+    [GlobalFunction.CODESCRIPTHASHVALUESUM_OUTPUTS]: [RadiantOp.OP_CODESCRIPTHASHVALUESUM_OUTPUTS],
     [GlobalFunction.CODESCRIPTHASHOUTPUTCOUNT_UTXOS]:
       [RadiantOp.OP_CODESCRIPTHASHOUTPUTCOUNT_UTXOS],
+    [GlobalFunction.CODESCRIPTHASHOUTPUTCOUNT_OUTPUTS]:
+      [RadiantOp.OP_CODESCRIPTHASHOUTPUTCOUNT_OUTPUTS],
     [GlobalFunction.CODESCRIPTHASHZEROVALUEDOUTPUTCOUNT_UTXOS]:
       [RadiantOp.OP_CODESCRIPTHASHZEROVALUEDOUTPUTCOUNT_UTXOS],
+    [GlobalFunction.CODESCRIPTHASHZEROVALUEDOUTPUTCOUNT_OUTPUTS]:
+      [RadiantOp.OP_CODESCRIPTHASHZEROVALUEDOUTPUTCOUNT_OUTPUTS],
   };
 
   return mapping[fn];
@@ -92,11 +99,15 @@ export function compileBinaryOp(op: BinaryOperator, numeric: boolean = false): S
     [BinaryOperator.BIT_AND]: [Op.OP_AND],
     [BinaryOperator.BIT_OR]: [Op.OP_OR],
     [BinaryOperator.BIT_XOR]: [Op.OP_XOR],
+    [BinaryOperator.BIT_LSHIFT]: [Op.OP_LSHIFT],
+    [BinaryOperator.BIT_RSHIFT]: [Op.OP_RSHIFT],
     [BinaryOperator.SPLIT]: [Op.OP_SPLIT],
   };
 
   if (numeric) {
     mapping[BinaryOperator.PLUS] = [Op.OP_ADD];
+    mapping[BinaryOperator.MUL] = [Op.OP_2MUL];
+    mapping[BinaryOperator.DIV] = [Op.OP_2DIV];
     mapping[BinaryOperator.EQ] = [Op.OP_NUMEQUAL];
     mapping[BinaryOperator.NE] = [Op.OP_NUMNOTEQUAL];
   }

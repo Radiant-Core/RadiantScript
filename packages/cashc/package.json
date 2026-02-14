@@ -1,6 +1,6 @@
 {
   "name": "rxdc",
-  "version": "0.7.2",
+  "version": "1.1.0-v2",
   "description": "Compile RadiantScript contracts to Radiant Script or artifacts",
   "keywords": [
     "radiant",

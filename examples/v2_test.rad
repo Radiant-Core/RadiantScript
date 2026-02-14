@@ -1,0 +1,15 @@
+contract V2Test() {
+    function test(int x, int y) {
+        // Test Bitwise Shifts
+        int shifted = x << 2;
+        require(shifted == x * 4);
+
+        // Test BLAKE3 Hashing
+        bytes32 hash = blake3(x);
+        require(hash != sha256(x));
+
+        // Test Optimized Math (2MUL)
+        int product = x * y;
+        require(product > 0);
+    }
+}

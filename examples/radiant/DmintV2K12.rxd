@@ -3,9 +3,19 @@
 // Identical to DmintV2Blake3 but uses k12() instead of blake3() for PoW.
 // K12 is based on Keccak-p[1600,12] and is faster than SHA-3 for short inputs.
 //
-// State layout (before OP_STATESEPARATOR):
-//   <height:4B> d8<contractRef:36B> d0<tokenRef:36B>
-//   <maxHeight> <reward> <target> <lastTime:4B> <targetTime>
+// V2 State layout (10 items, before OP_STATESEPARATOR):
+//   1. <height:4B>           — mutable, incremented each mint
+//   2. d8<contractRef:36B>   — immutable singleton ref
+//   3. d0<tokenRef:36B>      — immutable token ref
+//   4. <maxHeight>           — immutable
+//   5. <reward>              — immutable
+//   6. <algoId>              — immutable (0x02 = K12)
+//   7. <daaMode>             — immutable (0x02 = ASERT)
+//   8. <targetTime>          — immutable (seconds per mint)
+//   9. <lastTime:4B>         — mutable (previous mint timestamp)
+//  10. <target>              — mutable (DAA-adjusted PoW target)
+//
+// halfLife is embedded as an immutable bytecode constant, not a state item.
 //
 // Requires: Hard Fork V2 (OP_K12 = 0xef, OP_LSHIFT = 0x98, OP_RSHIFT = 0x99)
 
@@ -16,7 +26,8 @@ contract DmintV2K12(
     bytes36 tokenRef,
     int maxHeight,
     int reward,
-    int targetTime
+    int targetTime,
+    int halfLife        // DAA half-life in seconds (e.g. 3600)
 ) {
     function mint(
         bytes preimage,
@@ -34,21 +45,34 @@ contract DmintV2K12(
         require(newHeight <= maxHeight);
 
         // 3. On-chain DAA (ASERT-lite using bit shifts)
-        int timeDelta = newTime - tx.state.lastTime;
-        int shiftAmount = (timeDelta - targetTime) / targetTime;
-        int clampedShift = min(max(shiftAmount, -4), 4);
+        //    drift = (timeDelta - targetTime) / halfLife, clamped to [-4, +4]
+        int currentTime = tx.locktime;
+        int timeDelta = currentTime - tx.state.lastTime;
+        int excess = timeDelta - targetTime;
+        int drift = excess / halfLife;
+
+        int clampedDrift = min(max(drift, -4), 4);
 
         int adjustedTarget;
-        if (clampedShift > 0) {
-            adjustedTarget = tx.state.target << clampedShift;
-        } else if (clampedShift < 0) {
-            adjustedTarget = tx.state.target >> (0 - clampedShift);
+        if (clampedDrift > 0) {
+            adjustedTarget = tx.state.target << clampedDrift;
+        } else if (clampedDrift < 0) {
+            adjustedTarget = tx.state.target >> (0 - clampedDrift);
         } else {
             adjustedTarget = tx.state.target;
+        }
+
+        // Clamp target to minimum 1
+        if (adjustedTarget < 1) {
+            adjustedTarget = 1;
         }
         require(newTarget == adjustedTarget);
 
         // 4. Verify output preserves contract
         require(tx.outputs[this.activeInputIndex].value >= reward);
+
+        // 5. State propagated via output state script:
+        //    height+1, contractRef, tokenRef, maxHeight, reward,
+        //    algoId, daaMode, targetTime, currentTime, newTarget
     }
 }

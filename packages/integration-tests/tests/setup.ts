@@ -15,8 +15,13 @@ export const TEST_CONFIG = {
   electrumProtocol: 'ssl' as const,
 };
 
-// Skip network tests if SKIP_NETWORK_TESTS is set
-export const SKIP_NETWORK_TESTS = process.env.SKIP_NETWORK_TESTS === 'true';
+// Network tests are OPT-IN. Enable by setting RUN_NETWORK_TESTS=true
+// (or, for backward compatibility, by explicitly setting
+// SKIP_NETWORK_TESTS=false). Defaults to skipping so that running the
+// suite without a live ElectrumX endpoint does not produce hard failures.
+export const SKIP_NETWORK_TESTS = !(
+  process.env.RUN_NETWORK_TESTS === 'true' || process.env.SKIP_NETWORK_TESTS === 'false'
+);
 
 // Test wallet (testnet only - never use on mainnet!)
 export const TEST_WALLET = {

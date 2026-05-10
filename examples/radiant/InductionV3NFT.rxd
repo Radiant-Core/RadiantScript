@@ -1,0 +1,65 @@
+pragma radiantscript ^0.1.0;
+
+// InductionV3NFT - NFT using TxId v3 preimage for mathematical induction (Method 2)
+// Demonstrates embedding the parent's v3 preimage to verify the parent
+// transaction structure without exponential size growth.
+//
+// TxId v3 Preimage Layout (112 bytes):
+//   Bytes  0-3:    nVersion          (4B LE)
+//   Bytes  4-7:    nTotalInputs      (4B LE)
+//   Bytes  8-39:   hashPrevoutInputs (32B)
+//   Bytes 40-71:   hashSequence      (32B)
+//   Bytes 72-75:   nTotalOutputs     (4B LE)
+//   Bytes 76-107:  hashOutputHashes  (32B)
+//   Bytes 108-111: nLocktime         (4B LE)
+//
+// When nVersion == 3, the txid is hash256(preimage) instead of hash256(raw_tx).
+// This enables compact induction proofs without exponential size blowup.
+contract InductionV3NFT(
+    bytes36 constant $nftRef,
+    pubkey ownerPk
+) {
+    return {
+        // The caller provides the parent transaction's v3 preimage (112 bytes)
+        // in the unlocking script. The contract verifies it matches the parent.
+        transferWithProof(
+            sig s,
+            bytes112 parentPreimage  // TxId v3 preimage of parent transaction
+        ) {
+            require(checkSig(s, ownerPk));
+
+            pushInputRefSingleton($nftRef);
+            require(tx.outputs.refOutputCount($nftRef) == 1);
+
+            // Verify parentPreimage matches the input being spent:
+            // hash256(parentPreimage) must equal the parent's txid.
+            bytes32 derivedParentTxId = hash256(parentPreimage);
+            bytes32 actualParentTxId = tx.inputs[this.activeInputIndex].outpointTransactionHash;
+            require(derivedParentTxId == actualParentTxId);
+
+            // Extract nVersion and nTotalInputs (first 8 bytes).
+            bytes4 parentVersion, bytes108 rest1 = parentPreimage.split(4);
+            bytes4 parentInputCount, bytes104 rest2 = rest1.split(4);
+
+            // Skip hashPrevoutInputs + hashSequence (64 bytes) to reach output count.
+            bytes64 prevoutsAndSequence, bytes40 rest4 = rest2.split(64);
+            bytes4 parentOutputCount, bytes36 outputHashesAndLocktime = rest4.split(4);
+
+            // Verify parent was a v3 transaction with at least 1 input and 1 output.
+            require(int(parentVersion) == 3);
+            require(int(parentInputCount) >= 1);
+            require(int(parentOutputCount) >= 1);
+
+            // Bind the skipped chunks so they are part of the verified preimage.
+            // (length checks are compile-time tautologies but satisfy the unused-var
+            // check while documenting the layout.)
+            require(prevoutsAndSequence.length == 64);
+            require(outputHashesAndLocktime.length == 36);
+
+            // Ensure the output carries the same contract code.
+            bytes myCodeScript = tx.inputs[this.activeInputIndex].codeScript;
+            bytes32 myCodeHash = hash256(myCodeScript);
+            require(tx.outputs.codeScriptCount(myCodeHash) >= 1);
+        }
+    }
+}

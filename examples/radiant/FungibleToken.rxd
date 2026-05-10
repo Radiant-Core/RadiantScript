@@ -1,4 +1,4 @@
-pragma radiantscript ^0.9.0;
+pragma radiantscript ^0.1.0;
 
 // FungibleToken - A standard fungible token contract for Radiant
 // Uses reference-based token tracking with conservation enforcement
@@ -19,33 +19,33 @@ contract FungibleToken(
 ) {
     // Transfer tokens to new outputs
     // Conservation rule: sum of input token values == sum of output token values
-    function transfer(sig s) {
-        // Verify owner's signature
-        require(checkSig(s, ownerPk));
-        
-        // Push the token reference to track it
-        pushInputRef($tokenRef);
-        
-        // Get sum of token values in inputs and outputs
-        int inputTokens = tx.inputs.refValueSum($tokenRef);
-        int outputTokens = tx.outputs.refValueSum($tokenRef);
-        
-        // Enforce conservation: no tokens created or destroyed
-        require(inputTokens == outputTokens);
-    }
-    
-    // Burn tokens (reduce supply)
-    // Allows intentional destruction of tokens
-    function burn(sig s, int burnAmount) {
-        require(checkSig(s, ownerPk));
-        
-        pushInputRef($tokenRef);
-        
-        int inputTokens = tx.inputs.refValueSum($tokenRef);
-        int outputTokens = tx.outputs.refValueSum($tokenRef);
-        
-        // Output tokens should be less by burn amount
-        require(inputTokens - burnAmount == outputTokens);
-        require(burnAmount > 0);
+    return {
+    transfer(sig s) {
+            // Verify owner's signature
+            require(checkSig(s, ownerPk));
+            
+            // Push the token reference to track it
+            pushInputRef($tokenRef);
+            
+            // Get sum of token values in inputs and outputs
+            int inputTokens = tx.inputs.refValueSum($tokenRef);
+            int outputTokens = tx.outputs.refValueSum($tokenRef);
+            
+            // Enforce conservation: no tokens created or destroyed
+            require(inputTokens == outputTokens);
+        },
+
+    burn(sig s, int burnAmount) {
+            require(checkSig(s, ownerPk));
+            
+            pushInputRef($tokenRef);
+            
+            int inputTokens = tx.inputs.refValueSum($tokenRef);
+            int outputTokens = tx.outputs.refValueSum($tokenRef);
+            
+            // Output tokens should be less by burn amount
+            require(inputTokens - burnAmount == outputTokens);
+            require(burnAmount > 0);
+        }
     }
 }

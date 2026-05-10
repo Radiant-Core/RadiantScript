@@ -1,7 +1,7 @@
-// dMint V2 Contract: KangarooTwelve (K12) PoW with On-Chain DAA (ASERT-lite)
+// dMint V2 Contract: Blake3 PoW with On-Chain DAA (ASERT-lite)
 //
-// Identical to DmintV2Blake3 but uses k12() instead of blake3() for PoW.
-// K12 is based on Keccak-p[1600,12] and is faster than SHA-3 for short inputs.
+// This contract validates Blake3 proof-of-work and adjusts difficulty
+// on-chain using ASERT-lite (bit-shift approximation of exponential DAA).
 //
 // V2 State layout (10 items, before OP_STATESEPARATOR):
 //   1. <height:4B>           — mutable, incremented each mint
@@ -9,7 +9,7 @@
 //   3. d0<tokenRef:36B>      — immutable token ref
 //   4. <maxHeight>           — immutable
 //   5. <reward>              — immutable
-//   6. <algoId>              — immutable (0x02 = K12)
+//   6. <algoId>              — immutable (0x01 = Blake3)
 //   7. <daaMode>             — immutable (0x02 = ASERT)
 //   8. <targetTime>          — immutable (seconds per mint)
 //   9. <lastTime:4B>         — mutable (previous mint timestamp)
@@ -17,11 +17,11 @@
 //
 // halfLife is embedded as an immutable bytecode constant, not a state item.
 //
-// Requires: Hard Fork V2 (OP_K12 = 0xef, OP_LSHIFT = 0x98, OP_RSHIFT = 0x99)
+// Requires: Hard Fork V2 (OP_BLAKE3 = 0xee, OP_LSHIFT = 0x98, OP_RSHIFT = 0x99)
 
-pragma radiant ^2.0.0;
+pragma radiantscript ^0.1.0;
 
-contract DmintV2K12(
+contract DmintV2Blake3(
     bytes36 contractRef,
     bytes36 tokenRef,
     int maxHeight,
@@ -29,6 +29,7 @@ contract DmintV2K12(
     int targetTime,
     int halfLife        // DAA half-life in seconds (e.g. 3600)
 ) {
+    // Mint a new token by providing valid Blake3 proof-of-work
     function mint(
         bytes preimage,
         bytes8 nonce,
@@ -36,8 +37,8 @@ contract DmintV2K12(
         int newTarget,
         int newTime
     ) {
-        // 1. Validate PoW: k12(preimage || nonce) < current target
-        bytes32 hash = k12(preimage + nonce);
+        // 1. Validate PoW: blake3(preimage || nonce) must be below current target
+        bytes32 hash = blake3(preimage + nonce);
         require(hash < bytes32(tx.state.target));
 
         // 2. Validate state transition
@@ -46,17 +47,21 @@ contract DmintV2K12(
 
         // 3. On-chain DAA (ASERT-lite using bit shifts)
         //    drift = (timeDelta - targetTime) / halfLife, clamped to [-4, +4]
+        //    newTarget = oldTarget << drift  (or >> |drift| if negative)
         int currentTime = tx.locktime;
         int timeDelta = currentTime - tx.state.lastTime;
         int excess = timeDelta - targetTime;
         int drift = excess / halfLife;
 
+        // Clamp drift to prevent extreme adjustments (±4 bits per mint)
         int clampedDrift = min(max(drift, -4), 4);
 
         int adjustedTarget;
         if (clampedDrift > 0) {
+            // Mining was slower than target → easier (shift left)
             adjustedTarget = tx.state.target << clampedDrift;
         } else if (clampedDrift < 0) {
+            // Mining was faster than target → harder (shift right)
             adjustedTarget = tx.state.target >> (0 - clampedDrift);
         } else {
             adjustedTarget = tx.state.target;
@@ -68,7 +73,7 @@ contract DmintV2K12(
         }
         require(newTarget == adjustedTarget);
 
-        // 4. Verify output preserves contract
+        // 4. Verify output preserves contract (singleton ref + value)
         require(tx.outputs[this.activeInputIndex].value >= reward);
 
         // 5. State propagated via output state script:

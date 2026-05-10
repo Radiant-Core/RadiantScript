@@ -1,0 +1,59 @@
+pragma radiantscript ^0.1.0;
+
+// GlyphV2Authority - Authority token for project governance.
+// Implements GLYPH_AUTHORITY protocol (REP-3015).
+//
+// Models a delegable, optionally-revocable authority. The optional issuerRef
+// records the parent authority (zero bytes for a root authority) and is bound
+// into the script for off-chain provenance.
+contract GlyphV2Authority(
+    bytes36 constant $authorityRef,  // Authority singleton reference
+    pubkey holderPk,                 // Current authority holder
+    bool transferable,               // Can authority be transferred
+    bool revocable,                  // Can authority be revoked by issuer
+    bytes36 issuerRef                // Parent authority (zeros for root)
+) {
+    return {
+        // Transfer authority to new holder. The new holder pubkey is committed
+        // by the spender's signature; the actual key for the next UTXO is set
+        // by the unlocking transaction's output.
+        transfer(sig s, pubkey newHolderPk) {
+            require(checkSig(s, holderPk));
+            require(transferable);
+            require(newHolderPk != holderPk);
+
+            pushInputRefSingleton($authorityRef);
+            require(tx.outputs.refOutputCount($authorityRef) == 1);
+        },
+
+        // Delegate authority (signal a child-authority creation via signature).
+        // The actual child reference is recorded by indexers via the Glyph v2
+        // metadata envelope; on-chain we only enforce parent continuity and
+        // bind issuerRef into the signed script.
+        delegate(sig s) {
+            require(checkSig(s, holderPk));
+            require(issuerRef.length == 36);
+
+            pushInputRefSingleton($authorityRef);
+            require(tx.outputs.refOutputCount($authorityRef) == 1);
+        },
+
+        // Revoke a child authority (requires holder signature; revocable flag).
+        // As with delegate(), the child ref is committed via metadata.
+        revoke(sig s) {
+            require(checkSig(s, holderPk));
+            require(revocable);
+
+            pushInputRefSingleton($authorityRef);
+            require(tx.outputs.refOutputCount($authorityRef) == 1);
+        },
+
+        // Burn this authority (voluntary destruction).
+        burn(sig s) {
+            require(checkSig(s, holderPk));
+
+            pushInputRefSingleton($authorityRef);
+            require(tx.outputs.refOutputCount($authorityRef) == 0);
+        }
+    }
+}

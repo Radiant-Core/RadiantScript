@@ -1,0 +1,21 @@
+pragma radiantscript ^0.1.0;
+
+// GlyphV2NFTSoulbound - Non-transferable NFT (soulbound token).
+// Can only be burned, never transferred. Implements Glyph v2 Token Standard
+// (REP-3001) for non-transferable identity / credential tokens.
+contract GlyphV2NFTSoulbound(
+    bytes36 constant $nftRef,
+    pubkey ownerPk
+) {
+    return {
+        // Soulbound tokens can only be burned by the owner.
+        burn(sig s) {
+            require(checkSig(s, ownerPk));
+
+            pushInputRefSingleton($nftRef);
+
+            // Ensure the reference is destroyed (no output carries it).
+            require(tx.outputs.refOutputCount($nftRef) == 0);
+        }
+    }
+}

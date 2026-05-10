@@ -1,0 +1,26 @@
+pragma radiantscript ^0.1.0;
+
+// ValueConservationToken - Fungible token demonstrating tx.state for accounting
+// Uses tx.state.inputSum and tx.state.outputSum for fee-aware conservation.
+contract ValueConservationToken(
+    bytes36 constant $tokenRef,
+    pubkey ownerPk
+) {
+    return {
+        transfer(sig s) {
+            require(checkSig(s, ownerPk));
+
+            pushInputRef($tokenRef);
+
+            // Standard conservation: token value in == token value out.
+            int inputTokens = tx.inputs.refValueSum($tokenRef);
+            int outputTokens = tx.outputs.refValueSum($tokenRef);
+            require(inputTokens == outputTokens);
+
+            // Additional check using tx.state: verify total fee is reasonable.
+            int fee = tx.state.inputSum - tx.state.outputSum;
+            require(fee >= 0);
+            require(fee <= 1000000);  // Max 0.01 RXD fee
+        }
+    }
+}

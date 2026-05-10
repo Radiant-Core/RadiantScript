@@ -1,0 +1,47 @@
+pragma radiantscript ^0.1.0;
+
+// InductionNFT - NFT with provenance verification via induction (Method 1)
+// Verifies that the parent transaction had the same contract code,
+// creating an unbroken chain of verified logic from genesis to present.
+//
+// Method 1: Reference-based (OP_PUSHINPUTREF family) - O(1) constant time.
+// Combined with code-script introspection for the inductive step P(k) -> P(k+1).
+contract InductionNFT(
+    bytes36 constant $nftRef,  // Unique NFT reference
+    pubkey ownerPk             // Current owner's public key
+) {
+    return {
+        // Transfer with code-continuity induction proof.
+        // Verifies that the parent UTXO used the same contract code,
+        // guaranteeing the entire chain of ownership followed the same rules.
+        transfer(sig s) {
+            require(checkSig(s, ownerPk));
+
+            // Reference-based induction: chain guarantees provenance from genesis.
+            pushInputRefSingleton($nftRef);
+            require(tx.outputs.refOutputCount($nftRef) == 1);
+
+            // Code-continuity induction: same code script propagates forward.
+            bytes myCodeScript = tx.inputs[this.activeInputIndex].codeScript;
+            bytes32 myCodeHash = hash256(myCodeScript);
+            int sameCodeOutputs = tx.outputs.codeScriptCount(myCodeHash);
+            require(sameCodeOutputs >= 1);
+        },
+
+        // Transfer with fee verification using tx.state introspection.
+        // Demonstrates OP_PUSH_TX_STATE for accessing transaction-level data.
+        transferWithFeeCheck(sig s, int maxFee) {
+            require(checkSig(s, ownerPk));
+
+            pushInputRefSingleton($nftRef);
+            require(tx.outputs.refOutputCount($nftRef) == 1);
+
+            // tx.state.inputSum / tx.state.outputSum compile to OP_PUSH_TX_STATE.
+            int totalIn = tx.state.inputSum;
+            int totalOut = tx.state.outputSum;
+            int fee = totalIn - totalOut;
+            require(fee >= 0);
+            require(fee <= maxFee);
+        }
+    }
+}

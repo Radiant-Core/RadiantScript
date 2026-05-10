@@ -82,18 +82,27 @@ jobs:
       
       - name: Compile Glyph v2 contracts
         run: |
+          set -e
           if [ -d "examples/radiant" ]; then
+            shopt -s nullglob
+            failed=0
+            count=0
             for contract in examples/radiant/*.rxd; do
-              if [ -f "$contract" ]; then
-                echo "Compiling: $contract"
-                npx cashc "$contract" --output "${contract%.rxd}.json" || true
+              count=$((count + 1))
+              echo "Compiling: $contract"
+              if ! npx rxdc "$contract" --output "${contract%.rxd}.json"; then
+                echo "::error file=$contract::Compilation failed"
+                failed=$((failed + 1))
               fi
             done
+            echo "Compiled $count contracts; $failed failed."
+            if [ "$failed" -gt 0 ]; then
+              exit 1
+            fi
           fi
-        continue-on-error: true
-      
+
       - name: Verify contract artifacts
         run: |
           if [ -d "examples/radiant" ]; then
-            ls -la examples/radiant/*.json 2>/dev/null || echo "No compiled artifacts found"
+            ls -la examples/radiant/*.json 2>/dev/null || (echo "No compiled artifacts found" && exit 1)
           fi

@@ -38,6 +38,36 @@ Atomic swap between two token types.
 - Price enforcement
 - No counterparty risk
 
+### Glyph v2 reference contracts
+Production-style templates implementing the Glyph v2 Token Standard
+(REP-3001) and related protocols:
+
+- `GlyphV2FT.rxd` — fungible token (transfer, burn) with value-sum conservation
+- `GlyphV2NFT.rxd` — NFT with optional on-chain royalty enforcement
+- `GlyphV2NFTSoulbound.rxd` — non-transferable NFT (burn-only)
+- `GlyphV2Container.rxd` — collection / container token (REP-3013)
+- `GlyphV2Authority.rxd` — delegable authority token (REP-3015)
+
+### Induction proof patterns
+- `InductionNFT.rxd` — Method 1 (reference + code-continuity induction)
+- `InductionV3NFT.rxd` — Method 2 (TxId v3 preimage induction, 112-byte split)
+- `ValueConservationToken.rxd` — fee-aware conservation using `tx.state.{inputSum,outputSum}`
+
+### Drafts (`*.rxd.draft`)
+
+The following files describe contracts whose design depends on compiler
+features that are not yet implemented (array parameters, `tx.state.{height,
+target,lastTime}`, the `blake3()` / `k12()` global builtins, dynamic
+`pushInputRef(runtimeRef)`). They are kept as design references and are
+intentionally **not** compiled by CI:
+
+- `DmintV2Blake3.rxd.draft` — V2 dMint with on-chain BLAKE3 PoW + ASERT-lite DAA
+- `DmintV2K12.rxd.draft` — V2 dMint with on-chain K12 PoW + ASERT-lite DAA
+- `GlyphV2FTMint.rxd.draft` — Glyph v2 dMint reward contract
+
+These are tracked by the V2 Hard Fork upgrade plan; once the compiler grows the
+required globals/types these will be promoted back to `.rxd`.
+
 ## Usage with rxdeb
 
 All contracts can be compiled with debug info and debugged with rxdeb:

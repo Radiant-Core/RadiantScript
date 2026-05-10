@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^0.7.0;
 
 // ValueConservationToken - Fungible token demonstrating tx.state for accounting
 // Uses tx.state.inputSum and tx.state.outputSum for fee-aware conservation.

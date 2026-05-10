@@ -10,6 +10,8 @@ export interface AbiFunction {
   name?: string;
   index?: number;
   params: AbiInput[];
+  inputs?: AbiInput[];
+  covenant?: boolean;
 }
 
 export interface SourceMapEntry {
@@ -27,8 +29,11 @@ export interface Artifact {
   version: number;
   compilerVersion: string;
   contract: string;
+  contractName?: string;
   abi: AbiFunction[];
   asm: string;
+  bytecode?: string;
+  constructorInputs?: AbiInput[];
   hex?: string;
   source?: string;
   sourceMap?: SourceMap;

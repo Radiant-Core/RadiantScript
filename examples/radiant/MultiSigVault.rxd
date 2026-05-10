@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^0.7.0;
 
 // MultiSigVault - Multi-signature vault with Radiant introspection
 // Demonstrates 2-of-3 multisig with output verification

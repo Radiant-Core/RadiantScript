@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^0.7.0;
 
 // InductionV3NFT - NFT using TxId v3 preimage for mathematical induction (Method 2)
 // Demonstrates embedding the parent's v3 preimage to verify the parent

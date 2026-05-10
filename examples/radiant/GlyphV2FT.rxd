@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^0.7.0;
 
 // GlyphV2FT - Glyph v2 Fungible Token contract.
 // Implements the Glyph v2 Token Standard (REP-3001).

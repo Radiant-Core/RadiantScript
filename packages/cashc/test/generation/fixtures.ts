@@ -10,7 +10,7 @@ export const fixtures: Fixture[] = [
     fn: 'p2pkh.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'P2PKH',
       abi: [
         {
@@ -27,7 +27,7 @@ export const fixtures: Fixture[] = [
     fn: 'reassignment.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'Reassignment',
       abi: [
         {
@@ -58,7 +58,7 @@ export const fixtures: Fixture[] = [
     fn: 'if_statement.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'IfStatement',
       abi: [
         {
@@ -76,7 +76,7 @@ export const fixtures: Fixture[] = [
     fn: 'multifunction.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'MultiFunction',
       abi: [
         {
@@ -106,7 +106,7 @@ export const fixtures: Fixture[] = [
     fn: 'multifunction_if_statements.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'MultiFunctionIfStatements',
       abi: [
         {
@@ -125,7 +125,7 @@ export const fixtures: Fixture[] = [
     fn: '2_of_3_multisig.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'MultiSig',
       abi: [
         {
@@ -142,7 +142,7 @@ export const fixtures: Fixture[] = [
     fn: 'split_size.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'SplitSize',
       abi: [
         {
@@ -164,7 +164,7 @@ export const fixtures: Fixture[] = [
     fn: 'cast_hash_checksig.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'CastHashChecksig',
       abi: [
         {
@@ -183,7 +183,7 @@ export const fixtures: Fixture[] = [
     fn: 'hodl_vault.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'HodlVault',
       abi: [
         {
@@ -230,7 +230,7 @@ export const fixtures: Fixture[] = [
     fn: 'deep_replace.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'DeepReplace',
       abi: [
         {
@@ -258,7 +258,7 @@ export const fixtures: Fixture[] = [
     fn: 'bounded_bytes.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'BoundedBytes',
       abi: [
         {
@@ -275,7 +275,7 @@ export const fixtures: Fixture[] = [
     fn: 'covenant.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'Covenant',
       abi: [
         {
@@ -302,7 +302,7 @@ export const fixtures: Fixture[] = [
     fn: 'covenant_all_fields.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'Covenant',
       abi: [
         {
@@ -347,7 +347,7 @@ export const fixtures: Fixture[] = [
     fn: 'mecenas.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'Mecenas',
       abi: [
         {
@@ -410,7 +410,7 @@ export const fixtures: Fixture[] = [
     fn: 'announcement.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'Announcement',
       abi: [
         {
@@ -451,7 +451,7 @@ export const fixtures: Fixture[] = [
     fn: 'p2palindrome.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'P2Palindrome',
       abi: [
         {
@@ -468,7 +468,7 @@ export const fixtures: Fixture[] = [
     fn: 'num2bin_variable.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'Num2Bin',
       abi: [
         {
@@ -485,7 +485,7 @@ export const fixtures: Fixture[] = [
     fn: 'radiant.rxd',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'Radiant',
       abi: [
         {
@@ -613,7 +613,7 @@ export const fixtures: Fixture[] = [
     fn: 'state_script_function.rxd',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'StateScriptFunction',
       abi: [
         {
@@ -679,7 +679,7 @@ export const fixtures: Fixture[] = [
     fn: 'rxd_fungible_token.rxd',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'FungibleToken',
       abi: [
         {
@@ -718,7 +718,7 @@ export const fixtures: Fixture[] = [
     fn: 'induction_proof.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'InductionProofTest',
       abi: [
         {
@@ -737,7 +737,7 @@ export const fixtures: Fixture[] = [
     fn: 'shift_ops.cash',
     artifact: {
       version: 9,
-      compilerVersion: 'rxdc 0.1.0',
+      compilerVersion: 'rxdc 0.7.2',
       contract: 'ShiftOps',
       abi: [
         {

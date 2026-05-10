@@ -8,6 +8,7 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "experimentalDecorators": true,
+    "module": "es2020",
     "moduleResolution": "node",
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -16,5 +17,7 @@
   "exclude": [
     "node_modules",
     "dist",
+    "packages/deploy",
+    "packages/integration-tests",
   ],
 }

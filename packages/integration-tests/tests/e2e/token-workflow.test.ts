@@ -24,7 +24,7 @@ describe('E2E Token Workflow', () => {
   describe('Fungible Token Creation', () => {
     it('should compile a fungible token contract', () => {
       const source = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
 
         contract FungibleToken(pubkey mintAuthority) {
           return {
@@ -76,7 +76,7 @@ describe('E2E Token Workflow', () => {
   describe('NFT Creation', () => {
     it('should compile an NFT contract', () => {
       const source = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
 
         contract NFT(pubkey creator) {
           return {
@@ -120,7 +120,7 @@ describe('E2E Token Workflow', () => {
   describe('dMint Token Creation', () => {
     it('should compile a dMint contract', () => {
       const source = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
 
         contract dMintToken(bytes32 difficultyTarget) {
           return {

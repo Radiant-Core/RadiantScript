@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^0.7.0;
 
 // TokenSwap - Atomic swap between two different tokens
 // Demonstrates cross-reference verification

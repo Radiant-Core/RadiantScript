@@ -220,7 +220,7 @@ export class Transaction {
     });
 
     inputScripts.forEach((script, i) => {
-      transaction.inputs[i].unlockingBytecode = script;
+      transaction.inputs[i].unlockingBytecode = script as Uint8Array<ArrayBuffer>;
     });
 
     return binToHex(encodeTransaction(transaction));
@@ -240,7 +240,7 @@ export class Transaction {
     }
   }
 
-  private async getTxDetails(txid: string): Promise<TransactionDetails>
+  private async getTxDetails(txid: string): Promise<TransactionDetails>;
   private async getTxDetails(txid: string, raw: true): Promise<string>;
 
   private async getTxDetails(txid: string, raw?: true): Promise<TransactionDetails | string> {

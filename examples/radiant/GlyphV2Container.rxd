@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^0.7.0;
 
 // GlyphV2Container - Collection/Container contract for Glyph v2.
 // Implements GLYPH_CONTAINER protocol (REP-3013).

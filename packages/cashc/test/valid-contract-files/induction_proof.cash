@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^0.7.0;
 
 // Test contract for tx.state nullary operators and induction proof patterns
 contract InductionProofTest(

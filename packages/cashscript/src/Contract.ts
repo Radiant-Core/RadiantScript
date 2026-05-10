@@ -36,18 +36,22 @@ export class Contract {
     constructorArgs: Argument[],
     private provider: NetworkProvider = new ElectrumNetworkProvider(),
   ) {
-    const expectedProperties = ['abi', 'bytecode', 'constructorInputs', 'contractName'];
+    const expectedProperties = ['abi', 'asm', 'contract'];
     if (!expectedProperties.every((property) => property in artifact)) {
       throw new Error('Invalid or incomplete artifact provided');
     }
 
-    if (artifact.constructorInputs.length !== constructorArgs.length) {
-      throw new Error(`Incorrect number of arguments passed to ${artifact.contractName} constructor`);
+    const ctorEntry = artifact.abi.find((f) => f.type === 'constructor');
+    const constructorInputs = artifact.constructorInputs ?? ctorEntry?.params ?? [];
+    const contractName = artifact.contractName ?? artifact.contract;
+
+    if (constructorInputs.length !== constructorArgs.length) {
+      throw new Error(`Incorrect number of arguments passed to ${contractName} constructor`);
     }
 
     // Encode arguments (this also performs type checking)
     const encodedArgs = constructorArgs
-      .map((arg, i) => encodeArgument(arg, artifact.constructorInputs[i].type))
+      .map((arg, i) => encodeArgument(arg, constructorInputs[i].type))
       .reverse();
 
     // Check there's no signature templates in the constructor
@@ -55,8 +59,9 @@ export class Contract {
       throw new Error('Cannot use signatures in constructor');
     }
 
+    const bytecode = this.artifact.bytecode ?? this.artifact.asm;
     this.redeemScript = generateRedeemScript(
-      asmToScript(this.artifact.bytecode),
+      asmToScript(bytecode),
       encodedArgs as Uint8Array[],
     );
 
@@ -65,14 +70,14 @@ export class Contract {
     this.functions = {};
     if (artifact.abi.length === 1) {
       const f = artifact.abi[0];
-      this.functions[f.name] = this.createFunction(f);
+      if (f.name) this.functions[f.name] = this.createFunction(f);
     } else {
       artifact.abi.forEach((f, i) => {
-        this.functions[f.name] = this.createFunction(f, i);
+        if (f.name) this.functions[f.name] = this.createFunction(f, i);
       });
     }
 
-    this.name = artifact.contractName;
+    this.name = artifact.contractName ?? artifact.contract;
     this.address = scriptToAddress(this.redeemScript, this.provider.network);
     this.bytesize = calculateBytesize(this.redeemScript);
     this.opcount = countOpcodes(this.redeemScript);
@@ -93,13 +98,14 @@ export class Contract {
 
   private createFunction(abiFunction: AbiFunction, selector?: number): ContractFunction {
     return (...args: Argument[]) => {
-      if (abiFunction.inputs.length !== args.length) {
+      const fnInputs = abiFunction.inputs ?? abiFunction.params;
+      if (fnInputs.length !== args.length) {
         throw new Error(`Incorrect number of arguments passed to function ${abiFunction.name}`);
       }
 
       // Encode passed args (this also performs type checking)
       const encodedArgs = args
-        .map((arg, i) => encodeArgument(arg, abiFunction.inputs[i].type));
+        .map((arg, i) => encodeArgument(arg, fnInputs[i].type));
 
       return new Transaction(
         this.address,

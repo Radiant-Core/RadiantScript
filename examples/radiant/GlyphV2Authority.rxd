@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^0.7.0;
 
 // GlyphV2Authority - Authority token for project governance.
 // Implements GLYPH_AUTHORITY protocol (REP-3015).

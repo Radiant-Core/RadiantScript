@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^0.7.0;
 
 // FungibleToken - A standard fungible token contract for Radiant
 // Uses reference-based token tracking with conservation enforcement

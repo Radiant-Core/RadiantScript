@@ -1,4 +1,4 @@
-import { Artifact, asmToBytecode, optimiseBytecode, SourceMap } from '@radiantscript/utils';
+import { Artifact, asmToBytecode, optimiseBytecode } from '@radiantscript/utils';
 import { binToHex, binToUtf8, hexToBin } from '@bitauth/libauth';
 import { ANTLRInputStream, CommonTokenStream } from 'antlr4ts';
 import fs from 'fs';

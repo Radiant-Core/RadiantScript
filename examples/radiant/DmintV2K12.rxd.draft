@@ -19,7 +19,7 @@
 //
 // Requires: Hard Fork V2 (OP_K12 = 0xef, OP_LSHIFT = 0x98, OP_RSHIFT = 0x99)
 
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^0.7.0;
 
 contract DmintV2K12(
     bytes36 contractRef,

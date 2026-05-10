@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^0.7.0;
 
 // InductionNFT - NFT with provenance verification via induction (Method 1)
 // Verifies that the parent transaction had the same contract code,

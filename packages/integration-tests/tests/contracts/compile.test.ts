@@ -20,7 +20,7 @@ describe('Contract Compilation', () => {
   describe('Basic Contracts', () => {
     it('should compile a simple P2PKH-like contract', () => {
       const source = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
 
         contract P2PKH(pubkey owner) {
           return {
@@ -51,7 +51,7 @@ describe('Contract Compilation', () => {
 
     it('should compile a contract with multiple functions', () => {
       const source = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
 
         contract MultiFunc(pubkey owner, int threshold) {
           return {
@@ -78,7 +78,7 @@ describe('Contract Compilation', () => {
 
     it('should compile a timelock contract', () => {
       const source = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
 
         contract TimeLock(pubkey recipient, int unlockTime) {
           return {
@@ -102,7 +102,7 @@ describe('Contract Compilation', () => {
   describe('Token Contracts', () => {
     it('should compile a fungible token contract', () => {
       const source = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
 
         contract FungibleToken(pubkey mintAuthority) {
           return {
@@ -126,7 +126,7 @@ describe('Contract Compilation', () => {
 
     it('should compile an NFT contract', () => {
       const source = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
 
         contract NFT(pubkey creator) {
           return {
@@ -152,7 +152,7 @@ describe('Contract Compilation', () => {
   describe('Error Handling', () => {
     it('should throw on syntax errors', () => {
       const invalidSource = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
 
         contract Invalid {
           return {
@@ -170,7 +170,7 @@ describe('Contract Compilation', () => {
 
     it('should throw on undefined variables', () => {
       const invalidSource = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
 
         contract UndefinedVar() {
           return {
@@ -190,7 +190,7 @@ describe('Contract Compilation', () => {
   describe('Artifact Structure', () => {
     it('should include compiler metadata', () => {
       const source = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
         contract Metadata() {
           return { test() { require(true); } }
         }
@@ -206,7 +206,7 @@ describe('Contract Compilation', () => {
 
     it('should include source code when compiled with debug info', () => {
       const source = `
-        pragma radiantscript ^0.1.0;
+        pragma radiantscript ^0.7.0;
         contract WithSource() {
           return { test() { require(true); } }
         }

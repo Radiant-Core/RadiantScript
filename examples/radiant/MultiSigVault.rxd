@@ -1,4 +1,4 @@
-pragma radiantscript ^0.9.0;
+pragma radiantscript ^1.1.0;
 
 // MultiSigVault - Multi-signature vault with Radiant introspection
 // Demonstrates 2-of-3 multisig with output verification
@@ -16,25 +16,27 @@ pragma radiantscript ^0.9.0;
 contract MultiSigVault(
     pubkey pk1,
     pubkey pk2,
-    pubkey pk3
+    pubkey pk3,
+    // minAmount is a constructor constant — fixed at contract creation time.
+    // Making this a function argument would allow signers to pass 0, bypassing the check.
+    int constant minAmount
 ) {
     // Standard 2-of-3 multisig spend
     function spend(sig s1, sig s2) {
         require(checkMultiSig([s1, s2], [pk1, pk2, pk3]));
     }
-    
+
     // Spend with output verification
-    // Ensures a minimum amount goes to a specific output
-    function spendWithMinOutput(sig s1, sig s2, int minAmount) {
+    // Ensures output[0] receives at least minAmount and no output is below dust (546 sats).
+    // Output count is unrolled up to 3 — Radiant script does not support dynamic loops.
+    function spendWithMinOutput(sig s1, sig s2) {
         require(checkMultiSig([s1, s2], [pk1, pk2, pk3]));
-        
-        // Verify first output has at least minAmount
+
+        // Enforce the minimum required output to the primary recipient
         require(tx.outputs[0].value >= minAmount);
-        
-        // Ensure no dust outputs (minimum 546 satoshis)
+
+        // Anti-dust: check the first 3 outputs if they exist
         int numOutputs = tx.outputs.length;
-        // Note: Loop unrolling would be needed for variable iteration
-        // This example checks first 3 outputs
         if (numOutputs >= 1) {
             require(tx.outputs[0].value >= 546);
         }

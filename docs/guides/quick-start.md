@@ -76,7 +76,7 @@ The compiled artifact contains:
 ## Using with SDK
 
 ```typescript
-import { Contract, ElectrumNetworkProvider } from 'cashscript';
+import { Contract, ElectrumNetworkProvider } from 'radiantscript';
 import artifact from './HelloWorld.json';
 
 const provider = new ElectrumNetworkProvider('mainnet');

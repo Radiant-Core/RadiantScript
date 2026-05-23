@@ -1,4 +1,5 @@
-pragma cashscript ^0.7.0;
+pragma radiantscript ^1.1.0;
+// LEGACY: Ported from CashScript. Contract logic is BCH-origin; review before use on Radiant.
 
 /* This is a contract showcasing covenants outside of regular transactional use.
  * It enforces the contract to make an "announcement" on Memo.cash, and send the

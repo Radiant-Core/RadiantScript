@@ -71,4 +71,14 @@ export enum Reason {
   ILLEGAL_FORKID = 'Illegal use of SIGHASH_FORKID',
   MUST_USE_FORKID = 'Signature must use SIGHASH_FORKID',
   UNKNOWN = 'unknown error',
+
+  // Radiant-specific script failure reasons
+  PUSHINPUTREF_MISMATCH = 'OP_PUSHINPUTREF input reference mismatch',
+  REQUIREINPUTREF_MISSING = 'OP_REQUIREINPUTREF reference not found in inputs',
+  DISALLOWPUSHINPUTREF_VIOLATION = 'OP_DISALLOWPUSHINPUTREF reference present in inputs',
+  DISALLOWPUSHINPUTREFSIBLING_VIOLATION = 'OP_DISALLOWPUSHINPUTREFSIBLING sibling reference present',
+  SINGLETON_DUPLICATE = 'OP_PUSHINPUTREFSINGLETON reference used more than once',
+  REF_VALUE_SUM_MISMATCH = 'Reference value sum mismatch between inputs and outputs',
+  CODE_SCRIPT_MISMATCH = 'Code script hash mismatch on output',
+  STATE_SEPARATOR_INVALID = 'Invalid OP_STATESEPARATOR position or usage',
 }

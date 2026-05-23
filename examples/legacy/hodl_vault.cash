@@ -1,4 +1,5 @@
-pragma cashscript ^0.7.0;
+pragma radiantscript ^1.1.0;
+// LEGACY: Ported from CashScript. Contract logic is BCH-origin; review before use on Radiant.
 
 // This contract forces HODLing until a certain price target has been reached
 // A minimum block is provided to ensure that oracle price entries from before this block are disregarded

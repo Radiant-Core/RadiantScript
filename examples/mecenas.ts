@@ -1,7 +1,7 @@
 import { stringify } from '@bitauth/libauth';
 import { BITBOX } from 'bitbox-sdk';
-import { Contract, ElectrumNetworkProvider } from 'cashscript';
-import { compileFile } from 'cashc';
+import { Contract, ElectrumNetworkProvider } from 'radiantscript';
+import { compileFile } from 'rxdc';
 import path from 'path';
 
 run();

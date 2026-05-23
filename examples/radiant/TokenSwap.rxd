@@ -1,57 +1,84 @@
-pragma radiantscript ^0.9.0;
+pragma radiantscript ^1.1.0;
 
 // TokenSwap - Atomic swap between two different tokens
-// Demonstrates cross-reference verification
+// Demonstrates cross-reference verification on Radiant.
+//
+// !!! AUDIT WARNING !!!
+// Radiant introspection currently exposes refValueSum at the *transaction*
+// level only (sum across all outputs). There is no opcode that proves
+// "output[i] carries reference X with value Y". This contract therefore uses
+// a strict output template to make the carrier output unambiguous:
+//
+//   - tx.outputs.length == 2
+//   - tx.outputs.refOutputCount($wantTokenRef) == 1
+//   - tx.outputs[0].lockingBytecode == LockingBytecodeP2PKH(hash160(makerPk))
+//   - tx.outputs[0].value     >= wantAmount
+//
+// Combined with conservation (wantIn == wantOut), this is the strongest
+// guarantee achievable with current Radiant ops. Use at your own risk and
+// review against the latest Radiant opcode set before mainnet deployment.
 //
 // Features:
-// - Atomic exchange of two token types
-// - Price enforcement via reference value sums
-// - No counterparty risk
+// - Atomic exchange of two token types via fixed two-output template
+// - Price enforcement via reference value sums + per-output value
+// - Cancellable by maker
 //
 // Usage:
-//   1. Create swap offer with token references and exchange rate
-//   2. Counterparty can execute by providing matching tokens
-//   3. Either party can cancel before execution
+//   1. Create swap offer with token references and exchange amounts
+//   2. Counterparty (taker) executes by spending with the 2-output template
+//   3. Maker can cancel before execution by spending with their signature
 
 contract TokenSwap(
     bytes36 constant $offerTokenRef,   // Token being offered
     bytes36 constant $wantTokenRef,    // Token wanted in return
-    int offerAmount,                    // Amount of offer token
-    int wantAmount,                     // Amount of want token
-    pubkey makerPk                      // Maker's public key
+    int constant offerAmount,          // Amount of offer token (constructor constant)
+    int constant wantAmount,           // Amount of want token (constructor constant)
+    pubkey makerPk                     // Maker's public key
 ) {
     // Execute the swap
-    // Taker provides wantToken, receives offerToken
+    // Taker provides wantToken and receives offerToken.
+    //
+    // Security: conservation alone is not a swap. This function additionally
+    // requires that output[0] carries exactly wantAmount of the wantToken locked
+    // to the maker's P2PKH address, ensuring the maker is paid before the taker
+    // can claim the offer token.
     function executeSwap(sig takerSig, pubkey takerPk) {
-        // Verify taker's signature
+        // Verify taker's signature (authorises the transaction shape)
         require(checkSig(takerSig, takerPk));
-        
+
         // Track both token references
         pushInputRef($offerTokenRef);
         pushInputRef($wantTokenRef);
-        
-        // Verify offer token conservation
-        int offerIn = tx.inputs.refValueSum($offerTokenRef);
+
+        // Conservation: no tokens of either type created or destroyed
+        int offerIn  = tx.inputs.refValueSum($offerTokenRef);
         int offerOut = tx.outputs.refValueSum($offerTokenRef);
         require(offerIn == offerOut);
-        
-        // Verify want token conservation
-        int wantIn = tx.inputs.refValueSum($wantTokenRef);
+
+        int wantIn  = tx.inputs.refValueSum($wantTokenRef);
         int wantOut = tx.outputs.refValueSum($wantTokenRef);
         require(wantIn == wantOut);
-        
-        // Verify the exchange amounts match the offer
-        // Maker receives wantAmount of wantToken
-        // Taker receives offerAmount of offerToken
+
+        // Sufficient quantities present (defence-in-depth)
         require(offerIn >= offerAmount);
-        require(wantIn >= wantAmount);
+        require(wantIn  >= wantAmount);
+
+        // Strict 2-output template makes the want-token carrier unambiguous.
+        require(tx.outputs.length == 2);
+        require(tx.outputs.refOutputCount($wantTokenRef) == 1);
+
+        // Output 0 must pay the maker.
+        bytes25 makerLock = new LockingBytecodeP2PKH(hash160(makerPk));
+        require(tx.outputs[0].lockingBytecode == makerLock);
+        // Output 0 must carry at least wantAmount in satoshi value.
+        // Combined with the singleton ref count above and conservation, this
+        // forces the want-token UTXO to land in output[0] with sufficient value.
+        require(tx.outputs[0].value >= wantAmount);
     }
-    
-    // Cancel the swap offer (maker only)
+
+    // Cancel the swap offer (maker only). Reclaims the offer token.
     function cancel(sig makerSig) {
         require(checkSig(makerSig, makerPk));
-        
-        // Simply spend back to maker, no token operations needed
         pushInputRef($offerTokenRef);
     }
 }

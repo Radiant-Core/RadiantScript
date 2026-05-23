@@ -1,10 +1,8 @@
-import { Contract, ElectrumNetworkProvider, SignatureTemplate } from 'cashscript';
-import { compileFile } from 'cashc';
-import { 
+import { Contract, ElectrumNetworkProvider, SignatureTemplate } from 'radiantscript';
+import { compileFile } from 'rxdc';
+import {
   PrivateKey,
-  PublicKey,
-  Transaction,
-} from '@AirdropScripts/radiantjs';
+} from '@radiant-core/radiantjs';
 
 // FungibleToken Usage Example
 // Demonstrates minting, transferring, and burning fungible tokens
@@ -17,12 +15,16 @@ async function main() {
   const provider = new ElectrumNetworkProvider('mainnet');
   
   // Setup keys
-  const ownerPrivKey = PrivateKey.fromWIF('your-private-key-wif');
+  // SECURITY: Never hardcode private keys. Use environment variables or secure key management.
+  const ownerPrivKey = PrivateKey.fromWIF(process.env.PRIVATE_KEY_WIF || 'your-private-key-wif');
   const ownerPubKey = ownerPrivKey.toPublicKey();
   
   // Token reference (36 bytes: 32-byte txid + 4-byte vout in little-endian)
   // This would be the outpoint of the genesis transaction
-  const tokenRef = '0x' + 'a'.repeat(64) + '00000000'; // Example reference
+  // SECURITY: In production, generate this from an actual UTXO using:
+  //   const outpointHash = crypto.randomBytes(32).toString('hex'); // or actual tx hash
+  //   const tokenRef = '0x' + outpointHash + vout.toString(16).padStart(8, '0');
+  const tokenRef = '0x' + 'a'.repeat(64) + '00000000'; // Example reference - DO NOT USE IN PRODUCTION
   
   // Instantiate the contract
   const contract = new Contract(artifact, [tokenRef, ownerPubKey.toBuffer()], {

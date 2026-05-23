@@ -288,7 +288,10 @@ export default class AstBuilder
   }
 
   visitUnaryIntrospectionOp(ctx: UnaryIntrospectionOpContext): UnaryOpNode {
-    const operator = `${ctx._scope.text}[i].${ctx._op.text}` as UnaryOperator;
+    const scope = ctx._scope.text;
+    const operator = scope === 'tx.state'
+      ? UnaryOperator.TX_STATE
+      : `${scope}[i].${ctx._op.text}` as UnaryOperator;
     const expression = this.visit(ctx.expression());
     const unaryOp = new UnaryOpNode(operator, expression);
     unaryOp.location = Location.fromCtx(ctx);

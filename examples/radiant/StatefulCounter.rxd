@@ -1,4 +1,4 @@
-pragma radiantscript ^0.9.0;
+pragma radiantscript ^1.1.0;
 
 // StatefulCounter - Demonstrates state management with state separator
 // Uses OP_STATESEPARATOR to split state from code

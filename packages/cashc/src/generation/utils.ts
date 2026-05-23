@@ -7,7 +7,7 @@ import {
   PrimitiveType,
   Script,
   Type,
-} from '@cashscript/utils';
+} from '@radiantscript/utils';
 import { UnaryOperator, BinaryOperator, NullaryOperator } from '../ast/Operator.js';
 import { GlobalFunction, PushRefOp, TimeOp } from '../ast/Globals.js';
 
@@ -46,15 +46,10 @@ export function compileGlobalFunction(fn: GlobalFunction): Script {
     [GlobalFunction.HASH160]: [Op.OP_HASH160],
     [GlobalFunction.HASH256]: [Op.OP_HASH256],
     [GlobalFunction.WITHIN]: [Op.OP_WITHIN],
-    [GlobalFunction.BLAKE3]: [Op.OP_BLAKE3],
-    [GlobalFunction.K12]: [Op.OP_K12],
+    [GlobalFunction.BLAKE3]: [RadiantOp.OP_BLAKE3],
+    [GlobalFunction.K12]: [RadiantOp.OP_K12],
     [GlobalFunction.SHA512_256]: [RadiantOp.OP_SHA512_256],
     [GlobalFunction.HASH512_256]: [RadiantOp.OP_HASH512_256],
-    [GlobalFunction.CODESCRIPTHASHOUTPUTCOUNT_OUTPUTS]:
-      [RadiantOp.OP_CODESCRIPTHASHOUTPUTCOUNT_OUTPUTS],
-    [GlobalFunction.CODESCRIPTHASHVALUESUM_OUTPUTS]: [RadiantOp.OP_CODESCRIPTHASHVALUESUM_OUTPUTS],
-    [GlobalFunction.CODESCRIPTHASHZEROVALUEDOUTPUTCOUNT_OUTPUTS]:
-      [RadiantOp.OP_CODESCRIPTHASHZEROVALUEDOUTPUTCOUNT_OUTPUTS],
     [GlobalFunction.REFHASHVALUESUM_UTXOS]: [RadiantOp.OP_REFHASHVALUESUM_UTXOS],
     [GlobalFunction.REFHASHVALUESUM_OUTPUTS]: [RadiantOp.OP_REFHASHVALUESUM_OUTPUTS],
     [GlobalFunction.REFTYPE_UTXO]: [RadiantOp.OP_REFTYPE_UTXO],
@@ -139,6 +134,7 @@ export function compileUnaryOp(op: UnaryOperator): Op[] {
     [UnaryOperator.OUTPUT_STATESEPARATOR_INDEX]: [RadiantOp.OP_STATESEPARATORINDEX_OUTPUT],
     [UnaryOperator.OUTPUT_CODESCRIPTBYTECODE]: [RadiantOp.OP_CODESCRIPTBYTECODE_OUTPUT],
     [UnaryOperator.OUTPUT_STATESCRIPTBYTECODE]: [RadiantOp.OP_STATESCRIPTBYTECODE_OUTPUT],
+    [UnaryOperator.TX_STATE]: [RadiantOp.OP_PUSH_TX_STATE],
   };
 
   return mapping[op];

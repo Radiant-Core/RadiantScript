@@ -9,7 +9,6 @@ import {
   Transaction as LibauthTransaction,
   instantiateSecp256k1,
 } from '@bitauth/libauth';
-import delay from 'delay';
 import {
   AbiFunction,
   hash160,
@@ -37,11 +36,18 @@ import {
   createSighashPreimage,
   validateRecipient,
 } from './utils.js';
-import { P2SH_OUTPUT_SIZE, DUST_LIMIT } from './constants.js';
+import {
+  P2SH_OUTPUT_SIZE,
+  DUST_LIMIT,
+  MAX_FEE_SATOSHIS,
+  MAX_TRANSACTION_SIZE,
+  MAX_INPUT_COUNT,
+  MAX_OUTPUT_COUNT,
+  MAX_SAFE_SATOSHIS,
+} from './constants.js';
 import NetworkProvider from './network/NetworkProvider.js';
 import SignatureTemplate from './SignatureTemplate.js';
-
-const bip68 = require('bip68');
+import bip68 from 'bip68';
 
 export class Transaction {
   private inputs: Utxo[] = [];
@@ -78,7 +84,14 @@ export class Transaction {
   experimentalFromP2PKH(input: Utxo, template: SignatureTemplate): this;
   experimentalFromP2PKH(inputs: Utxo[], template: SignatureTemplate): this;
 
+  /**
+   * @deprecated This is an experimental feature that may be removed or changed in future versions.
+   * Use with caution in production. Consider using the standard `from()` method instead.
+   */
   experimentalFromP2PKH(inputOrInputs: Utxo | Utxo[], template: SignatureTemplate): this {
+    // eslint-disable-next-line no-console
+    console.warn('WARNING: experimentalFromP2PKH is an experimental feature. Use with caution in production.');
+
     if (!Array.isArray(inputOrInputs)) {
       inputOrInputs = [inputOrInputs];
     }
@@ -123,16 +136,31 @@ export class Transaction {
   }
 
   withHardcodedFee(hardcodedFee: number): this {
+    if (hardcodedFee < 0) {
+      throw new Error(`Fee cannot be negative: ${hardcodedFee}`);
+    }
+    if (hardcodedFee > MAX_FEE_SATOSHIS) {
+      throw new Error(`Fee ${hardcodedFee} exceeds maximum allowed fee of ${MAX_FEE_SATOSHIS} satoshis`);
+    }
     this.hardcodedFee = hardcodedFee;
     return this;
   }
 
   withFeePerByte(feePerByte: number): this {
+    if (feePerByte < 0) {
+      throw new Error(`Fee per byte cannot be negative: ${feePerByte}`);
+    }
+    if (feePerByte > 100) {
+      throw new Error(`Fee per byte ${feePerByte} exceeds reasonable maximum of 100 sats/byte`);
+    }
     this.feePerByte = feePerByte;
     return this;
   }
 
   withMinChange(minChange: number): this {
+    if (minChange < 0) {
+      throw new Error(`Minimum change cannot be negative: ${minChange}`);
+    }
     this.minChange = minChange;
     return this;
   }
@@ -145,6 +173,14 @@ export class Transaction {
     this.locktime = this.locktime ?? await this.provider.getBlockHeight();
     await this.setInputsAndOutputs();
 
+    // Validate input/output counts
+    if (this.inputs.length > MAX_INPUT_COUNT) {
+      throw new Error(`Too many inputs: ${this.inputs.length} exceeds maximum of ${MAX_INPUT_COUNT}`);
+    }
+    if (this.outputs.length > MAX_OUTPUT_COUNT) {
+      throw new Error(`Too many outputs: ${this.outputs.length} exceeds maximum of ${MAX_OUTPUT_COUNT}`);
+    }
+
     const secp256k1 = await instantiateSecp256k1();
     const bytecode = scriptToBytecode(this.redeemScript);
 
@@ -154,6 +190,9 @@ export class Transaction {
       sequenceNumber: this.sequence,
       unlockingBytecode: new Uint8Array(),
     }));
+
+    // Validate amount bounds before conversion
+    this.outputs.forEach((output) => this.validateAmount(output.amount));
 
     const outputs = this.outputs.map((output) => {
       const lockingBytecode = typeof output.to === 'string'
@@ -223,7 +262,14 @@ export class Transaction {
       transaction.inputs[i].unlockingBytecode = script;
     });
 
-    return binToHex(encodeTransaction(transaction));
+    const txHex = binToHex(encodeTransaction(transaction));
+
+    // Validate transaction size
+    if (txHex.length / 2 > MAX_TRANSACTION_SIZE) {
+      throw new Error(`Transaction size ${txHex.length / 2} bytes exceeds maximum of ${MAX_TRANSACTION_SIZE} bytes`);
+    }
+
+    return txHex;
   }
 
   async send(): Promise<TransactionDetails>;
@@ -236,16 +282,17 @@ export class Transaction {
       return raw ? await this.getTxDetails(txid, raw) : await this.getTxDetails(txid);
     } catch (e: any) {
       const reason = e.error ?? e.message;
-      throw buildError(reason, meep(tx, this.inputs, this.redeemScript));
+      throw buildError(reason, meep(tx, this.inputs, this.redeemScript, this.provider.network));
     }
   }
 
-  private async getTxDetails(txid: string): Promise<TransactionDetails>
-  private async getTxDetails(txid: string, raw: true): Promise<string>;
-
-  private async getTxDetails(txid: string, raw?: true): Promise<TransactionDetails | string> {
-    for (let retries = 0; retries < 1200; retries += 1) {
-      await delay(500);
+  private async getTxDetails(txid: string, raw?: true, signal?: AbortSignal): Promise<TransactionDetails | string> {
+    const maxRetries = 1200;
+    for (let retries = 0; retries < maxRetries; retries += 1) {
+      if (signal?.aborted) {
+        throw new Error('getTxDetails aborted by caller');
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
       try {
         const hex = await this.provider.getRawTransaction(txid);
 
@@ -258,13 +305,12 @@ export class Transaction {
       }
     }
 
-    // Should not happen
     throw new Error('Could not retrieve transaction details for over 10 minutes');
   }
 
   async meep(): Promise<string> {
     const tx = await this.build();
-    return meep(tx, this.inputs, this.redeemScript);
+    return meep(tx, this.inputs, this.redeemScript, this.provider.network);
   }
 
   private async setInputsAndOutputs(): Promise<void> {
@@ -339,6 +385,22 @@ export class Transaction {
     // Add a change output if applicable
     if (change >= DUST_LIMIT && change >= this.minChange) {
       this.outputs.push({ to: this.address, amount: change });
+    }
+  }
+
+  /**
+   * Validates that an amount is within safe bounds for transaction outputs.
+   * Prevents integer overflow and negative amount issues.
+   */
+  private validateAmount(amount: number): void {
+    if (amount < 0) {
+      throw new Error(`Amount cannot be negative: ${amount}`);
+    }
+    if (amount > Number.MAX_SAFE_INTEGER) {
+      throw new Error(`Amount ${amount} exceeds maximum safe integer (${Number.MAX_SAFE_INTEGER})`);
+    }
+    if (BigInt(amount) > MAX_SAFE_SATOSHIS) {
+      throw new Error(`Amount ${amount} exceeds maximum safe satoshi value`);
     }
   }
 }

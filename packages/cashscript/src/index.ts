@@ -1,5 +1,13 @@
 export { Contract } from './Contract.js';
 export { Transaction } from './Transaction.js';
+export {
+  encodeTokenRef,
+  decodeTokenRef,
+  buildStatefulOutput,
+  encodePush,
+  encodeScriptInt,
+  splitStatefulBytecode,
+} from './RadiantHelpers.js';
 export { Argument } from './Argument.js';
 export { default as SignatureTemplate } from './SignatureTemplate.js';
 export { Artifact, AbiFunction, AbiInput } from '@radiantscript/utils';

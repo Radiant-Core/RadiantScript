@@ -1,12 +1,11 @@
-import { PrimitiveType, ArrayType, BytesType } from '@cashscript/utils';
+import { PrimitiveType, ArrayType, BytesType } from '@radiantscript/utils';
 import { SymbolTable, Symbol } from './SymbolTable.js';
 
 export const NumberUnit: { [index:string] : number } = {
-  SATOSHIS: 1,
+  PHOTONS: 1,
   SATS: 1,
-  FINNEY: 10,
-  BITS: 100,
-  BITCOIN: 100000000,
+  SATOSHIS: 1,
+  RXD: 100000000,
   SECONDS: 1,
   MINUTES: 60,
   HOURS: 3600,

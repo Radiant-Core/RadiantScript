@@ -1,4 +1,4 @@
-pragma radiantscript ^0.9.0;
+pragma radiantscript ^1.1.0;
 
 // NFT - Non-Fungible Token (Singleton) contract for Radiant
 // Uses singleton references to ensure uniqueness
@@ -31,16 +31,20 @@ contract NFT(
         require(outputCount == 1);
     }
     
-    // Transfer with data update (e.g., metadata pointer)
+    // Transfer with data update (e.g., metadata pointer update)
+    // The new owner receives the NFT and the output's state section is set to newData.
     function transferWithData(sig s, bytes newData) {
         require(checkSig(s, ownerPk));
-        
+
         pushInputRefSingleton($nftRef);
-        
-        // Ensure singleton property
+
+        // Ensure singleton property: exactly one output carries this reference
         require(tx.outputs.refOutputCount($nftRef) == 1);
-        
-        // newData can be used in the output script's state section
-        // to update metadata or other associated data
+
+        // Enforce that output[0] actually stores newData in its state section.
+        // tx.outputs[0].stateScript returns the bytes before OP_STATESEPARATOR.
+        // Without this check, newData is accepted by the unlocking script but
+        // completely ignored by the locking script — equivalent to transfer().
+        require(tx.outputs[0].stateScript == newData);
     }
 }

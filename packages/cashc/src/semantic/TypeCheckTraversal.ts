@@ -45,6 +45,7 @@ import {
   CastSizeError,
   TupleAssignmentError,
   PushTypeError,
+  UnsupportedOperatorError,
 } from '../Errors.js';
 import { BinaryOperator, NullaryOperator, UnaryOperator } from '../ast/Operator.js';
 import { GlobalFunction, Modifier } from '../ast/Globals.js';
@@ -225,6 +226,9 @@ export default class TypeCheckTraversal extends AstTraversal {
         expectSameSizeBytes(node, node.left.type, node.right.type);
         node.type = node.left.type;
         return node;
+      case BinaryOperator.BIT_LSHIFT:
+      case BinaryOperator.BIT_RSHIFT:
+        throw new UnsupportedOperatorError(node);
       case BinaryOperator.SPLIT:
         expectAnyOfTypes(node, node.left.type, [new BytesType(), PrimitiveType.STRING]);
         expectInt(node, node.right.type);
@@ -287,6 +291,10 @@ export default class TypeCheckTraversal extends AstTraversal {
         return node;
       case UnaryOperator.INPUT_REF_DATA_SUMMARY:
       case UnaryOperator.OUTPUT_REF_DATA_SUMMARY:
+        expectInt(node, node.expression.type);
+        node.type = new BytesType();
+        return node;
+      case UnaryOperator.TX_STATE:
         expectInt(node, node.expression.type);
         node.type = new BytesType();
         return node;

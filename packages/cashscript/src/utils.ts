@@ -1,8 +1,4 @@
 import {
-  cashAddressToLockingBytecode,
-  AddressType,
-  addressContentsToLockingBytecode,
-  lockingBytecodeToCashAddress,
   binToHex,
   createTransactionContextCommon,
   bigIntToBinUint64LE,
@@ -11,6 +7,8 @@ import {
   utf8ToBin,
   hexToBin,
   flattenBinArray,
+  base58AddressToLockingBytecode,
+  lockingBytecodeToBase58Address,
 } from '@bitauth/libauth';
 import {
   encodeInt,
@@ -163,6 +161,11 @@ export function buildError(reason: string, meepStr: string): FailedTransactionEr
   const require = [
     Reason.EVAL_FALSE, Reason.VERIFY, Reason.EQUALVERIFY, Reason.CHECKMULTISIGVERIFY,
     Reason.CHECKSIGVERIFY, Reason.CHECKDATASIGVERIFY, Reason.NUMEQUALVERIFY,
+    // Radiant-specific require-equivalent failures
+    Reason.PUSHINPUTREF_MISMATCH, Reason.REQUIREINPUTREF_MISSING,
+    Reason.DISALLOWPUSHINPUTREF_VIOLATION, Reason.DISALLOWPUSHINPUTREFSIBLING_VIOLATION,
+    Reason.SINGLETON_DUPLICATE, Reason.REF_VALUE_SUM_MISMATCH,
+    Reason.CODE_SCRIPT_MISMATCH, Reason.STATE_SEPARATOR_INVALID,
   ];
   const timeCheck = [Reason.NEGATIVE_LOCKTIME, Reason.UNSATISFIED_LOCKTIME];
   const sigCheck = [
@@ -186,56 +189,70 @@ export function buildError(reason: string, meepStr: string): FailedTransactionEr
 }
 
 function toRegExp(reasons: string[]): RegExp {
-  return new RegExp(reasons.join('|').replace(/\(/g, '\\(').replace(/\)/g, '\\)'));
+  // Escape special regex characters to prevent ReDoS attacks
+  const escapeRegExp = (string: string): string => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+
+  // Limit total pattern length to prevent excessive regex processing
+  const MAX_PATTERN_LENGTH = 500;
+  const joinedPattern = reasons.map(escapeRegExp).join('|');
+
+  if (joinedPattern.length > MAX_PATTERN_LENGTH) {
+    throw new Error(`Pattern too long: ${joinedPattern.length} characters exceeds maximum of ${MAX_PATTERN_LENGTH}`);
+  }
+
+  return new RegExp(joinedPattern);
 }
 
 // ////////// MISC ////////////////////////////////////////////////////////////
-export function meep(tx: any, utxos: Utxo[], script: Script): string {
-  const scriptPubkey = binToHex(scriptToLockingBytecode(script));
+export function meep(tx: any, utxos: Utxo[], script: Script, network: string = Network.MAINNET): string {
+  const scriptPubkey = binToHex(scriptToLockingBytecode(script, network));
   return `meep debug --tx=${tx} --idx=0 --amt=${utxos[0].satoshis} --pkscript=${scriptPubkey}`;
 }
 
 export function scriptToAddress(script: Script, network: string): string {
-  const lockingBytecode = scriptToLockingBytecode(script);
-  const prefix = getNetworkPrefix(network);
-  const address = lockingBytecodeToCashAddress(lockingBytecode, prefix) as string;
-  return address;
+  const scriptHash = hash160(scriptToBytecode(script));
+  const version = getP2SHVersionByte(network);
+  const lockingBytecode = new Uint8Array([version, ...scriptHash]);
+  const result = lockingBytecodeToBase58Address(lockingBytecode);
+  if (typeof result === 'string') throw new Error(result);
+  return result;
 }
 
-export function scriptToLockingBytecode(script: Script): Uint8Array {
+export function scriptToLockingBytecode(script: Script, network: string = Network.MAINNET): Uint8Array {
   const scriptHash = hash160(scriptToBytecode(script));
-  const addressContents = { payload: scriptHash, type: AddressType.p2sh };
-  const lockingBytecode = addressContentsToLockingBytecode(addressContents);
-  return lockingBytecode;
+  const version = getP2SHVersionByte(network);
+  return new Uint8Array([version, ...scriptHash]);
 }
 
 /**
-* Helper function to convert an address to a locking script
+* Helper function to convert a Radiant Base58Check address to a locking script
 *
-* @param address   Address to convert to locking script
+* @param address   Base58Check address to convert to locking script
 *
 * @returns a locking script corresponding to the passed address
 */
 export function addressToLockScript(address: string): Uint8Array {
-  const result = cashAddressToLockingBytecode(address);
+  const result = base58AddressToLockingBytecode(address);
 
   if (typeof result === 'string') throw new Error(result);
 
   return result.bytecode;
 }
 
-export function getNetworkPrefix(network: string): 'bitcoincash' | 'bchtest' | 'bchreg' {
+/**
+ * Returns the P2SH version byte for the given Radiant network.
+ * Mainnet: 0x05 (P2SH), Testnet/Regtest: 0xc4 (196)
+ */
+export function getP2SHVersionByte(network: string): number {
   switch (network) {
-    case Network.MAINNET:
-      return 'bitcoincash';
-    case Network.STAGING:
-      return 'bchtest';
     case Network.TESTNET:
-      return 'bchtest';
     case Network.REGTEST:
-      return 'bchreg';
+      return 0xc4;
+    case Network.MAINNET:
     default:
-      return 'bitcoincash';
+      return 0x05;
   }
 }
 

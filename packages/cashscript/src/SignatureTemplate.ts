@@ -9,12 +9,13 @@ export default class SignatureTemplate {
     signer: Keypair | Uint8Array | string,
     private hashtype: HashType = HashType.SIGHASH_ALL,
     private signatureAlgorithm: SignatureAlgorithm = SignatureAlgorithm.SCHNORR,
+    network: 'mainnet' | 'testnet' | undefined = undefined,
   ) {
     if (isKeypair(signer)) {
       const wif = signer.toWIF();
-      this.privateKey = decodeWif(wif);
+      this.privateKey = decodeWif(wif, network);
     } else if (typeof signer === 'string') {
-      this.privateKey = decodeWif(signer);
+      this.privateKey = decodeWif(signer, network);
     } else {
       this.privateKey = signer;
     }
@@ -46,11 +47,19 @@ function isKeypair(obj: any): obj is Keypair {
   return typeof obj.toWIF === 'function';
 }
 
-function decodeWif(wif: string): Uint8Array {
+function decodeWif(wif: string, expectedNetwork?: 'mainnet' | 'testnet'): Uint8Array {
   const result = decodePrivateKeyWif({ hash: sha256 }, wif);
 
   if (typeof result === 'string') {
     throw new Error(result);
+  }
+
+  // Validate network if specified
+  if (expectedNetwork && result.network !== expectedNetwork) {
+    throw new Error(
+      `WIF network mismatch: expected ${expectedNetwork}, got ${result.network}. ` +
+      'Ensure you are using the correct network for your private key.'
+    );
   }
 
   return result.privateKey;

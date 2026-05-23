@@ -1,7 +1,7 @@
 import { stringify } from '@bitauth/libauth';
 import { BITBOX } from 'bitbox-sdk';
-import { Contract, SignatureTemplate, ElectrumNetworkProvider } from 'cashscript';
-import { compileFile } from 'cashc';
+import { Contract, SignatureTemplate, ElectrumNetworkProvider } from 'radiantscript';
+import { compileFile } from 'rxdc';
 import path from 'path';
 import { PriceOracle } from './PriceOracle.js';
 

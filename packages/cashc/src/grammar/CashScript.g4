@@ -129,6 +129,7 @@ expression
     | expression '[' index=NumberLiteral ']' # TupleIndexOp
     | scope='tx.outputs' '[' expression ']' '.' op=Identifier # UnaryIntrospectionOp
     | scope='tx.inputs' '[' expression ']' '.' op=Identifier # UnaryIntrospectionOp
+    | scope='tx.state' '[' expression ']' '.' op=TxStateField # UnaryIntrospectionOp
     | scope='tx.outputs' '.' Identifier expressionList # IntrospectionFunctionCall
     | scope='tx.inputs' '.' Identifier expressionList # IntrospectionFunctionCall
     | scope='tx.outputs.zeroValue' '.' Identifier expressionList # IntrospectionFunctionCall
@@ -139,7 +140,7 @@ expression
     | op=('!' | '-') expression # UnaryOp
     | left=expression op=('*' | '/' | '%') right=expression # BinaryOp
     | left=expression op=('+' | '-') right=expression # BinaryOp
-    // | expression ('>>' | '<<') expression --- OP_LSHIFT & RSHIFT are disabled in BCH Script
+    | left=expression op=('>>' | '<<') right=expression # BinaryOp
     | left=expression op=('<' | '<=' | '>' | '>=') right=expression # BinaryOp
     | left=expression op=('==' | '!=') right=expression # BinaryOp
     | left=expression op='&' right=expression # BinaryOp
@@ -182,7 +183,7 @@ BooleanLiteral
     ;
 
 NumberUnit
-    : 'satoshis' | 'sats' | 'finney' | 'bits' | 'bitcoin'
+    : 'photons' | 'satoshis' | 'sats' | 'rxd' | 'finney' | 'bits' | 'bitcoin'
     | 'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
     ;
 
@@ -214,6 +215,12 @@ HexLiteral
 TxVar
     : 'tx.age'
     | 'tx.time'
+    ;
+
+TxStateField
+    : 'txid'
+    | 'inputSum'
+    | 'outputSum'
     ;
 
 NullaryOp

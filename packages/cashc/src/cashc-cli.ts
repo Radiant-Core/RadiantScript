@@ -41,17 +41,24 @@ function run(): void {
   const outputFile = opts.output && opts.output !== '-' && path.resolve(opts.output);
 
   try {
+    // Security warning for debug mode
+    if (opts.debug) {
+      console.warn('⚠️  SECURITY WARNING: Debug mode includes full source code in the artifact.');
+      console.warn('   Do not publish debug artifacts to public repositories or the blockchain.');
+      console.warn('   Source code exposure may aid attackers in finding vulnerabilities.\n');
+    }
+
     const artifact = compileFile(sourceFile, { debug: opts.debug });
     const script = asmToScript(artifact.asm);
 
     const opcount = countOpcodes(script);
     const bytesize = calculateBytesize(script);
 
-    if (opcount > 201) {
-      console.warn('Warning: Your contract\'s opcount is over the limit of 201 and will not be accepted by the BCH network');
+    if (opcount > 32000000) {
+      console.warn('Warning: Your contract\'s opcount is over the limit of 32,000,000 and will not be accepted by the Radiant network');
     }
-    if (bytesize > 520) {
-      console.warn('Warning: Your contract\'s bytesize is over the limit of 520 and will not be accepted by the BCH network');
+    if (bytesize > 32000000) {
+      console.warn('Warning: Your contract\'s bytesize is over the limit of 32,000,000 bytes and will not be accepted by the Radiant network');
     }
 
     if (opts.asm) {

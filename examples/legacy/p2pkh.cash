@@ -1,4 +1,5 @@
-pragma cashscript ^0.7.0;
+pragma radiantscript ^1.1.0;
+// LEGACY: Ported from CashScript. Contract logic is BCH-origin; review before use on Radiant.
 
 contract P2PKH(bytes20 pkh) {
     // Require pk to match stored pkh and signature to match

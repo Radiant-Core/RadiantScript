@@ -1,6 +1,6 @@
-import { Contract, ElectrumNetworkProvider, SignatureTemplate } from 'cashscript';
-import { compileFile } from 'cashc';
-import { PrivateKey } from '@AirdropScripts/radiantjs';
+import { Contract, ElectrumNetworkProvider, SignatureTemplate } from 'radiantscript';
+import { compileFile } from 'rxdc';
+import { PrivateKey } from '@radiant-core/radiantjs';
 
 // NFT (Non-Fungible Token) Usage Example
 // Demonstrates minting and transferring singleton NFTs
@@ -13,14 +13,18 @@ async function main() {
   const provider = new ElectrumNetworkProvider('mainnet');
   
   // Setup owner keys
-  const ownerPrivKey = PrivateKey.fromWIF('your-private-key-wif');
+  // SECURITY: Never hardcode private keys. Use environment variables or secure key management.
+  const ownerPrivKey = PrivateKey.fromWIF(process.env.PRIVATE_KEY_WIF || 'your-private-key-wif');
   const ownerPubKey = ownerPrivKey.toPublicKey();
   
   // New owner for transfer
   const newOwnerPubKey = PrivateKey.fromRandom().toPublicKey();
   
   // NFT reference (unique identifier from genesis tx)
-  const nftRef = '0x' + 'b'.repeat(64) + '00000000';
+  // SECURITY: In production, generate this from an actual UTXO using:
+  //   const outpointHash = crypto.randomBytes(32).toString('hex'); // or actual tx hash
+  //   const nftRef = '0x' + outpointHash + vout.toString(16).padStart(8, '0');
+  const nftRef = '0x' + 'b'.repeat(64) + '00000000'; // Example - DO NOT USE IN PRODUCTION
   
   // Instantiate contract
   const contract = new Contract(artifact, [nftRef, ownerPubKey.toBuffer()], {

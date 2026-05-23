@@ -1,4 +1,5 @@
-pragma cashscript ^0.7.0;
+pragma radiantscript ^1.1.0;
+// LEGACY: Ported from CashScript. Contract logic is BCH-origin; review before use on Radiant.
 
 // This is an experimental contract for a more "streaming" Mecenas experience
 // Completely untested, just a concept

@@ -30,6 +30,7 @@ export enum UnaryOperator {
   OUTPUT_STATESEPARATOR_INDEX = 'tx.outputs[i].stateSeparatorIndex',
   OUTPUT_CODESCRIPTBYTECODE = 'tx.outputs[i].codeScript',
   OUTPUT_STATESCRIPTBYTECODE = 'tx.outputs[i].stateScript',
+  TX_STATE = 'tx.state',
 }
 
 export enum BinaryOperator {

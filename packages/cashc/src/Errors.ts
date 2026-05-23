@@ -178,7 +178,7 @@ export class UnsupportedTypeError extends TypeError {
       super(node, actual, expected, `Tried to access member '${node.operator}' on unsupported type '${actual}'`);
     } else if (node instanceof UnaryOpNode && node.operator.includes('[i]')) {
       const [scope] = node.operator.split('[i]');
-      super(node, actual, expected, `Tried to index '${scope}''with unsupported type '${actual}'`);
+      super(node, actual, expected, `Tried to index '${scope}' with unsupported type '${actual}'`);
     } else if (node instanceof UnaryOpNode) {
       super(node, actual, expected, `Tried to apply operator '${node.operator}' to unsupported type '${actual}'`);
     } else if (node instanceof TimeOpNode) {
@@ -262,7 +262,7 @@ export class VersionError extends Error {
     actual: string,
     constraint: string,
   ) {
-    const message = `cashc version ${actual} does not satisfy version constraint ${constraint}`;
+    const message = `rxdc version ${actual} does not satisfy version constraint ${constraint}`;
     super(message);
 
     this.name = this.constructor.name;
@@ -274,5 +274,13 @@ export class PushTypeError extends CashScriptError {
     node: Node,
   ) {
     super(node, 'Push parameter must be a hex literal or inline bytes parameter');
+  }
+}
+
+export class UnsupportedOperatorError extends CashScriptError {
+  constructor(
+    node: BinaryOpNode,
+  ) {
+    super(node, `Operator '${node.operator}' is not supported on the Radiant network`);
   }
 }

@@ -97,6 +97,9 @@ export enum RadiantOp {
   OP_STATESCRIPTBYTECODE_UTXO = 0xeb,
   OP_STATESCRIPTBYTECODE_OUTPUT = 0xec,
   OP_PUSH_TX_STATE = 0xed,
+
+  OP_BLAKE3 = 0xee,
+  OP_K12 = 0xef,
 }
 
 const radiantOpMapping: any = Object.fromEntries(Object.entries(RadiantOp).map(([k, v]) => ([k, `OP_UNKNOWN${v}`])));
@@ -223,15 +226,26 @@ function getPushDataOpcode(data: Uint8Array): Uint8Array {
  * @returns completed redeem script
  */
 export function replaceBytecodeNop(script: Script): Script {
-  const index = script.findIndex((op) => op === Op.OP_NOP);
+  // Create a copy to avoid mutating the original
+  const scriptCopy = [...script];
+  const index = scriptCopy.findIndex((op) => op === Op.OP_NOP);
   if (index < 0) return script;
 
   // Remove the OP_NOP
-  script.splice(index, 1);
+  scriptCopy.splice(index, 1);
+
+  // Bounds check: after splicing, index might be out of bounds
+  if (index >= scriptCopy.length) {
+    return script;
+  }
 
   // Retrieve size of current OP_SPLIT
-  let oldCut = script[index];
+  let oldCut = scriptCopy[index];
   if (oldCut instanceof Uint8Array) {
+    // Validate encoded int bounds
+    if (oldCut.length > 8) {
+      throw new Error('Encoded integer exceeds maximum byte length');
+    }
     oldCut = decodeInt(oldCut);
   } else if (oldCut === Op.OP_0) {
     oldCut = 0;
@@ -241,15 +255,20 @@ export function replaceBytecodeNop(script: Script): Script {
     return script;
   }
 
+  // Validate the computed value
+  if (oldCut < 0 || oldCut > Number.MAX_SAFE_INTEGER) {
+    throw new Error('Invalid cut value: out of safe integer range');
+  }
+
   // Update the old OP_SPLIT by adding either 1 or 3 to it
-  script[index] = encodeInt(oldCut + 1);
-  const bytecodeSize = calculateBytesize(script);
+  scriptCopy[index] = encodeInt(oldCut + 1);
+  const bytecodeSize = calculateBytesize(scriptCopy);
   if (bytecodeSize > 252) {
-    script[index] = encodeInt(oldCut + 3);
+    scriptCopy[index] = encodeInt(oldCut + 3);
   }
 
   // Minimally encode
-  return asmToScript(scriptToAsm(script));
+  return asmToScript(scriptToAsm(scriptCopy));
 }
 
 export function generateRedeemScript(baseScript: Script, encodedArgs: Script): Script {

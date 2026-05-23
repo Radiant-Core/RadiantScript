@@ -99,7 +99,7 @@ function () {
 
 ## Standard Library Templates
 
-The `examples/radiant/` directory contains ready-to-use contract templates:
+The `examples/radiant/` directory contains contract templates:
 
 | Contract | Description |
 |----------|-------------|
@@ -108,6 +108,15 @@ The `examples/radiant/` directory contains ready-to-use contract templates:
 | **StatefulCounter.rxd** | State management with stateSeparator |
 | **MultiSigVault.rxd** | 2-of-3 multisig with introspection |
 | **TokenSwap.rxd** | Atomic swap between token types |
+
+> ⚠️ **These templates are illustrative.** They have been hardened against the
+> issues flagged in `SECURITY_AUDIT_REPORT.md` (constructor constants where
+> needed, output templates in `TokenSwap`, pkh-in-state for `FungibleToken`,
+> etc.), but they have **not** been audited for production deployment on
+> mainnet. Before deploying any of these contracts with real value, review the
+> contract source against the latest Radiant opcode semantics, add tests for
+> your specific use case, and consider an external audit. RadiantScript itself
+> is alpha software.
 
 See [examples/radiant/README.md](examples/radiant/README.md) for usage details.
 
@@ -125,7 +134,7 @@ RadiantScript supports all Radiant opcodes including:
 
 Run tests:
 ```
-yarn test
+npm test
 ```
 
 Please see tests for example contracts including usage of Radiant specific op codes.

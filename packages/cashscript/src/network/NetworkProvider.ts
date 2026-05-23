@@ -8,7 +8,8 @@ export default interface NetworkProvider {
 
   /**
    * Retrieve all UTXOs (confirmed and unconfirmed) for a given address.
-   * @param address The CashAddress for which we wish to retrieve UTXOs.
+   * @param address The Radiant base58check address (P2PKH or P2SH) for which
+   *                we wish to retrieve UTXOs. Radiant does not use cashaddr.
    * @returns List of UTXOs spendable by the provided address.
    */
   getUtxos(address: string): Promise<Utxo[]>;

@@ -7,8 +7,8 @@ import {
   utf8ToBin,
   hexToBin,
   flattenBinArray,
-  base58AddressToLockingBytecode,
-  lockingBytecodeToBase58Address,
+  encodeBase58AddressFormat,
+  decodeBase58AddressFormat,
 } from '@bitauth/libauth';
 import {
   encodeInt,
@@ -39,10 +39,25 @@ import {
   FailedSigCheckError,
 } from './Errors.js';
 
+// `encodeBase58AddressFormat` / `decodeBase58AddressFormat` in libauth ^1.19
+// require an injected SHA-256 implementation; wrap the project's own SHA-256
+// in the shape libauth expects so callers don't need to thread it through.
+const sha256Adapter = { hash: (input: Uint8Array): Uint8Array => sha256(input) };
+
 // ////////// PARAMETER VALIDATION ////////////////////////////////////////////
 export function validateRecipient(recipient: Recipient): void {
   if (recipient.amount < DUST_LIMIT) {
     throw new OutputSatoshisTooSmallError(recipient.amount);
+  }
+
+  // Reject malformed addresses early so the caller sees a descriptive error
+  // here rather than a libauth decoder string surfacing deep in `build()`.
+  // Radiant uses Bitcoin-style base58check addresses (no cashaddr prefix).
+  if (typeof recipient.to === 'string') {
+    const decoded = decodeBase58AddressFormat(sha256Adapter, recipient.to);
+    if (typeof decoded === 'string') {
+      throw new Error(`Invalid recipient address "${recipient.to}": ${decoded}`);
+    }
   }
 }
 
@@ -214,31 +229,75 @@ export function meep(tx: any, utxos: Utxo[], script: Script, network: string = N
 export function scriptToAddress(script: Script, network: string): string {
   const scriptHash = hash160(scriptToBytecode(script));
   const version = getP2SHVersionByte(network);
-  const lockingBytecode = new Uint8Array([version, ...scriptHash]);
-  const result = lockingBytecodeToBase58Address(lockingBytecode);
-  if (typeof result === 'string') throw new Error(result);
-  return result;
-}
-
-export function scriptToLockingBytecode(script: Script, network: string = Network.MAINNET): Uint8Array {
-  const scriptHash = hash160(scriptToBytecode(script));
-  const version = getP2SHVersionByte(network);
-  return new Uint8Array([version, ...scriptHash]);
+  // `encodeBase58AddressFormat` performs: prepend version, sha256d checksum,
+  // base58 encode. Returns a plain string — no error path for valid 20-byte
+  // payloads, but we guard anyway.
+  return encodeBase58AddressFormat(sha256Adapter, version, scriptHash);
 }
 
 /**
-* Helper function to convert a Radiant Base58Check address to a locking script
-*
-* @param address   Base58Check address to convert to locking script
-*
-* @returns a locking script corresponding to the passed address
-*/
-export function addressToLockScript(address: string): Uint8Array {
-  const result = base58AddressToLockingBytecode(address);
+ * Build the P2SH locking-script bytecode for a redeem script:
+ *   `OP_HASH160 <20-byte hash> OP_EQUAL` (23 bytes).
+ *
+ * Note: the `network` parameter is kept for backward compatibility but is no
+ * longer required — P2SH locking scripts are network-agnostic; only the
+ * encoded *address* (see `scriptToAddress`) depends on the network.
+ */
+export function scriptToLockingBytecode(script: Script, _network: string = Network.MAINNET): Uint8Array {
+  const scriptHash = hash160(scriptToBytecode(script));
+  return new Uint8Array([
+    0xa9, // OP_HASH160
+    0x14, // push 20 bytes
+    ...scriptHash,
+    0x87, // OP_EQUAL
+  ]);
+}
 
+/**
+ * Helper function to convert a Radiant Base58Check address to its locking
+ * script. Recognises both P2PKH (version 0x00 mainnet / 0x6f testnet+regtest)
+ * and P2SH (version 0x05 / 0xc4) addresses and emits the matching standard
+ * locking-bytecode template:
+ *
+ * - P2PKH: `OP_DUP OP_HASH160 <hash> OP_EQUALVERIFY OP_CHECKSIG`
+ * - P2SH:  `OP_HASH160 <hash> OP_EQUAL`
+ *
+ * @param address  Base58Check address to convert to locking script
+ * @returns        Locking-script bytecode corresponding to the address
+ * @throws         If the address fails base58 decode or has an unknown version
+ */
+export function addressToLockScript(address: string): Uint8Array {
+  const result = decodeBase58AddressFormat(sha256Adapter, address);
   if (typeof result === 'string') throw new Error(result);
 
-  return result.bytecode;
+  const { version, payload } = result;
+  if (payload.byteLength !== 20) {
+    throw new Error(`Invalid address "${address}": payload is ${payload.byteLength} bytes, expected 20`);
+  }
+
+  // P2PKH version bytes: 0x00 (mainnet) / 0x6f (testnet & regtest).
+  if (version === 0x00 || version === 0x6f) {
+    return new Uint8Array([
+      0x76, // OP_DUP
+      0xa9, // OP_HASH160
+      0x14, // push 20 bytes
+      ...payload,
+      0x88, // OP_EQUALVERIFY
+      0xac, // OP_CHECKSIG
+    ]);
+  }
+
+  // P2SH version bytes: 0x05 (mainnet) / 0xc4 (testnet & regtest).
+  if (version === 0x05 || version === 0xc4) {
+    return new Uint8Array([
+      0xa9, // OP_HASH160
+      0x14, // push 20 bytes
+      ...payload,
+      0x87, // OP_EQUAL
+    ]);
+  }
+
+  throw new Error(`Invalid address "${address}": unknown version byte 0x${version.toString(16).padStart(2, '0')}`);
 }
 
 /**

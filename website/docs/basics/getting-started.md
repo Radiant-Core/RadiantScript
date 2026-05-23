@@ -9,7 +9,7 @@ The command line RadiantScript compiler `rxdc` can be installed from the reposit
 ```bash
 git clone https://github.com/Radiant-Core/RadiantScript.git
 cd RadiantScript
-yarn install
+npm install
 ```
 
 The compiler will be available at `node_modules/.bin/rxdc` or via `npx rxdc`.

@@ -49,6 +49,16 @@ import NetworkProvider from './network/NetworkProvider.js';
 import SignatureTemplate from './SignatureTemplate.js';
 import bip68 from 'bip68';
 
+/**
+ * Optional polling controls for {@link Transaction.send}.
+ */
+export interface SendOptions {
+  /** Abort the post-broadcast polling loop. */
+  signal?: AbortSignal;
+  /** Override the default polling cap (1200 iterations ≈ 10 min at 500 ms). */
+  maxRetries?: number;
+}
+
 export class Transaction {
   private inputs: Utxo[] = [];
   private outputs: Output[] = [];
@@ -146,6 +156,18 @@ export class Transaction {
     return this;
   }
 
+  /**
+   * Set the fee rate in satoshis per byte. The value is clamped to a maximum
+   * of **100 sat/byte** as a safety belt against runaway fees from caller bugs
+   * (e.g. forgetting to convert from sat/kB). Pass a value of 0 only if you
+   * know what you are doing — the resulting transaction will likely be
+   * rejected by relay policy.
+   *
+   * If you genuinely need to broadcast at >100 sat/byte during extreme
+   * congestion, build the transaction yourself with `withHardcodedFee()`.
+   *
+   * @throws If `feePerByte` is negative or greater than 100.
+   */
   withFeePerByte(feePerByte: number): this {
     if (feePerByte < 0) {
       throw new Error(`Fee per byte cannot be negative: ${feePerByte}`);
@@ -272,22 +294,42 @@ export class Transaction {
     return txHex;
   }
 
-  async send(): Promise<TransactionDetails>;
-  async send(raw: true): Promise<string>;
+  async send(opts?: SendOptions): Promise<TransactionDetails>;
+  async send(raw: true, opts?: SendOptions): Promise<string>;
 
-  async send(raw?: true): Promise<TransactionDetails | string> {
+  /**
+   * Broadcast the transaction and poll the network until it is confirmed visible.
+   *
+   * @param raw   When `true`, returns the raw transaction hex instead of decoded details.
+   * @param opts  Optional polling controls:
+   *              - `signal`:    `AbortSignal` to cancel the polling loop. The poll throws
+   *                             `'getTxDetails aborted by caller'` on next iteration.
+   *              - `maxRetries`: Override the default 1200 (≈10 min @ 500 ms) polling cap.
+   */
+  async send(
+    rawOrOpts?: true | SendOptions,
+    maybeOpts?: SendOptions,
+  ): Promise<TransactionDetails | string> {
+    const raw = rawOrOpts === true ? true : undefined;
+    const opts = (rawOrOpts === true ? maybeOpts : rawOrOpts) ?? {};
     const tx = await this.build();
     try {
       const txid = await this.provider.sendRawTransaction(tx);
-      return raw ? await this.getTxDetails(txid, raw) : await this.getTxDetails(txid);
+      return raw
+        ? await this.getTxDetails(txid, raw, opts.signal, opts.maxRetries)
+        : await this.getTxDetails(txid, undefined, opts.signal, opts.maxRetries);
     } catch (e: any) {
       const reason = e.error ?? e.message;
       throw buildError(reason, meep(tx, this.inputs, this.redeemScript, this.provider.network));
     }
   }
 
-  private async getTxDetails(txid: string, raw?: true, signal?: AbortSignal): Promise<TransactionDetails | string> {
-    const maxRetries = 1200;
+  private async getTxDetails(
+    txid: string,
+    raw?: true,
+    signal?: AbortSignal,
+    maxRetries: number = 1200,
+  ): Promise<TransactionDetails | string> {
     for (let retries = 0; retries < maxRetries; retries += 1) {
       if (signal?.aborted) {
         throw new Error('getTxDetails aborted by caller');

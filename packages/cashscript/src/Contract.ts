@@ -36,10 +36,7 @@ export class Contract {
     constructorArgs: Argument[],
     private provider: NetworkProvider = new ElectrumNetworkProvider(),
   ) {
-    const expectedProperties = ['abi', 'asm', 'contract'];
-    if (!expectedProperties.every((property) => property in artifact)) {
-      throw new Error('Invalid or incomplete artifact provided');
-    }
+    validateArtifact(artifact);
 
     const constructorAbi = artifact.abi.find((f) => f.type === 'constructor');
     if (!constructorAbi) {
@@ -119,3 +116,66 @@ export class Contract {
 }
 
 export type ContractFunction = (...args: Argument[]) => Transaction;
+
+/**
+ * Validate that a third-party artifact matches the expected schema before the
+ * compiler/runtime tries to use it. Catches malformed JSON early instead of
+ * surfacing as a downstream TypeError. Throws with a descriptive message
+ * naming the offending field on failure.
+ */
+function validateArtifact(artifact: unknown): asserts artifact is Artifact {
+  if (artifact === null || typeof artifact !== 'object') {
+    throw new Error('Invalid artifact: expected an object');
+  }
+  const a = artifact as Record<string, unknown>;
+
+  if (typeof a.contract !== 'string' || a.contract.length === 0) {
+    throw new Error('Invalid artifact: "contract" must be a non-empty string');
+  }
+  if (typeof a.asm !== 'string' || a.asm.length === 0) {
+    throw new Error(`Invalid artifact (${a.contract}): "asm" must be a non-empty string`);
+  }
+  if (!Array.isArray(a.abi)) {
+    throw new Error(`Invalid artifact (${a.contract}): "abi" must be an array`);
+  }
+
+  let sawConstructor = false;
+  a.abi.forEach((entry, idx) => {
+    if (entry === null || typeof entry !== 'object') {
+      throw new Error(`Invalid artifact (${a.contract}): abi[${idx}] must be an object`);
+    }
+    const fn = entry as Record<string, unknown>;
+    if (fn.type !== 'function' && fn.type !== 'constructor') {
+      throw new Error(
+        `Invalid artifact (${a.contract}): abi[${idx}].type must be 'function' or 'constructor'`,
+      );
+    }
+    if (fn.type === 'constructor') sawConstructor = true;
+    if (fn.type === 'function' && typeof fn.name !== 'string') {
+      throw new Error(`Invalid artifact (${a.contract}): abi[${idx}].name must be a string for functions`);
+    }
+    if (!Array.isArray(fn.params)) {
+      throw new Error(`Invalid artifact (${a.contract}): abi[${idx}].params must be an array`);
+    }
+    fn.params.forEach((p, pidx) => {
+      if (p === null || typeof p !== 'object') {
+        throw new Error(`Invalid artifact (${a.contract}): abi[${idx}].params[${pidx}] must be an object`);
+      }
+      const param = p as Record<string, unknown>;
+      if (typeof param.name !== 'string') {
+        throw new Error(
+          `Invalid artifact (${a.contract}): abi[${idx}].params[${pidx}].name must be a string`,
+        );
+      }
+      if (typeof param.type !== 'string') {
+        throw new Error(
+          `Invalid artifact (${a.contract}): abi[${idx}].params[${pidx}].type must be a string`,
+        );
+      }
+    });
+  });
+
+  if (!sawConstructor) {
+    throw new Error(`Invalid artifact (${a.contract}): abi is missing a constructor entry`);
+  }
+}

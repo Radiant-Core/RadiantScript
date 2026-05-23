@@ -130,6 +130,19 @@ require(wantIn >= wantAmount);
 - `package-lock.json` (574 KB) and `yarn.lock` (323 KB) co-exist.
 - `.travis.yml` uses `npm test`. CI (`.github/workflows/ci.yml`) uses `npm ci`. The `package.json` scripts reference `yarn cashproof`.
 - **Fix:** pick one package manager. With `lerna ^9` and `"workspaces"` field, either npm or yarn works; check in only one lockfile to avoid drift.
+- **Status (2026-05-23):** `lerna.json` switched to `npmClient: "npm"` and `useWorkspaces` removed (deprecated in lerna v9). `yarn.lock` deleted in working tree; commit. Remaining doc updates of `yarn install` → `npm install` applied in `README.md`, `examples/README.md`, `docs/guides/quick-start.md`, `website/docs/basics/getting-started.md`.
+
+### 3.13 Cashaddr leakage in tests / fixtures / docs (Radiant uses base58)
+Radiant inherits Bitcoin's legacy base58check address scheme (no bech32 / no cashaddr / no `bitcoincash:` prefix). The SDK source code is *already* Radiant-correct — `@/Users/macbookair/CascadeProjects/RadiantScript/packages/cashscript/src/utils.ts:214-256` uses `lockingBytecodeToBase58Address` / `base58AddressToLockingBytecode` with version bytes `0x05` (P2SH mainnet) / `0xc4` (P2SH testnet+regtest), and `@/Users/macbookair/CascadeProjects/RadiantScript/packages/cashscript/src/Contract.ts:78` calls `scriptToAddress` which uses base58. `@/Users/macbookair/CascadeProjects/RadiantScript/packages/cashscript/src/Transaction.ts:245` uses libauth's `addressContentsToLockingBytecode` which is just P2PKH script-template construction (network-agnostic), so no cashaddr exposure there.
+
+**Remaining leakage (test / fixture / doc only):**
+- `@/Users/macbookair/CascadeProjects/RadiantScript/packages/cashscript/test/test-util.ts:2,22` — imports & calls `lockingBytecodeToCashAddress` for debug output. Swap to `lockingBytecodeToBase58Address` with the correct version byte (`getP2SHVersionByte(network)`).
+- `@/Users/macbookair/CascadeProjects/RadiantScript/packages/cashscript/test/util.test.ts:84-100` — assertions still expect `bitcoincash:` / `bchtest:` / `bchreg:` strings. These tests would already fail against the current source. Replace with base58 round-trip expectations.
+- `@/Users/macbookair/CascadeProjects/RadiantScript/packages/cashscript/test/fixture/vars.ts:23-24` — derives addresses via `bitbox.ECPair.toCashAddress`. `bitbox-sdk` is a stale BCH dep and is not installed by the current `package.json`; replace with libauth-based key + address derivation.
+- `@/Users/macbookair/CascadeProjects/RadiantScript/packages/cashscript/test/fixture/p2pkh-invalid.json:27` — contains a literal `bchtest:` address string. Re-encode as base58 or note that this is the *invalid* fixture (used to assert compiler rejection) and unrelated to address roundtrip.
+- `@/Users/macbookair/CascadeProjects/RadiantScript/packages/cashscript/src/network/NetworkProvider.ts:11` — JSDoc reads "CashAddress for which we wish to retrieve UTXOs"; update to "Radiant base58 address".
+
+**Bonus hardening uncovered while surveying:** `validateRecipient` at `@/Users/macbookair/CascadeProjects/RadiantScript/packages/cashscript/src/utils.ts:43-47` validates `amount` but never that `recipient.to` is a parseable base58 address. A malformed `to` string only surfaces during locking-script construction. Add an early parseability check.
 
 ---
 

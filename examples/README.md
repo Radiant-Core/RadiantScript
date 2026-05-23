@@ -23,7 +23,7 @@ examples/
 
 ```bash
 cd examples
-yarn install
+npm install
 ```
 
 ### Compile a Contract

@@ -15,7 +15,7 @@ git clone https://github.com/Radiant-Core/RadiantScript.git
 cd RadiantScript
 
 # Install dependencies
-yarn install
+npm install
 
 # The compiler is now available
 npx rxdc --version

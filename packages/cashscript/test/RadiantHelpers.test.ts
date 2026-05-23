@@ -191,4 +191,38 @@ describe('splitStatefulBytecode', () => {
     expect(result).not.toBeNull();
     expect(result!.codeScript).toEqual(code);
   });
+
+  // ─── Adversarial cases (audit §3/§4) ───────────────────────────────────
+  // Confirm that 0xbd bytes sitting INSIDE various data-push payloads are
+  // NOT treated as OP_STATESEPARATOR. The first 0xbd *outside* any push is
+  // the real separator. These cases are the ones the audit explicitly
+  // flagged as "simple byte scan may be incorrect for adversarial inputs".
+
+  it('does not treat 0xbd inside a direct push as a separator', () => {
+    // 0x03 push of three 0xbd bytes, then a real OP_STATESEPARATOR, then code.
+    const full = new Uint8Array([0x03, 0xbd, 0xbd, 0xbd, OP_STATESEPARATOR, 0x51]);
+    const result = splitStatefulBytecode(full);
+    expect(result).not.toBeNull();
+    expect(result!.stateData).toEqual(new Uint8Array([0x03, 0xbd, 0xbd, 0xbd]));
+    expect(result!.codeScript).toEqual(new Uint8Array([0x51]));
+  });
+
+  it('does not treat 0xbd inside an OP_PUSHDATA1 push as a separator', () => {
+    // OP_PUSHDATA1 0x05 then 5 0xbd bytes, then a real separator, then code.
+    const full = new Uint8Array([0x4c, 0x05, 0xbd, 0xbd, 0xbd, 0xbd, 0xbd, OP_STATESEPARATOR, 0x52]);
+    const result = splitStatefulBytecode(full);
+    expect(result).not.toBeNull();
+    expect(result!.stateData).toEqual(new Uint8Array([0x4c, 0x05, 0xbd, 0xbd, 0xbd, 0xbd, 0xbd]));
+    expect(result!.codeScript).toEqual(new Uint8Array([0x52]));
+  });
+
+  it('does not treat 0xbd inside an OP_PUSHDATA2 push as a separator', () => {
+    // OP_PUSHDATA2 with little-endian length 0x0004 = 4 bytes, all 0xbd.
+    const full = new Uint8Array([
+      0x4d, 0x04, 0x00, 0xbd, 0xbd, 0xbd, 0xbd, OP_STATESEPARATOR, 0x53,
+    ]);
+    const result = splitStatefulBytecode(full);
+    expect(result).not.toBeNull();
+    expect(result!.codeScript).toEqual(new Uint8Array([0x53]));
+  });
 });

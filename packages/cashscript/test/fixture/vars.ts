@@ -6,15 +6,17 @@
  * stays stable across runs without needing an HD-wallet implementation.
  *
  * The exported `alice`/`bob` objects expose `.toWIF()` and `.privateKey` so
- * they remain drop-in compatible with `SignatureTemplate`. The original
- * `oracle`, `oraclePk`, and `bitbox` exports are e2e-only and are now
- * lazy-throwing stubs — calling them from a unit test will fail loudly and
- * is intentional (see `SECURITY_AUDIT_REPORT.md` §3.13).
+ * they remain drop-in compatible with `SignatureTemplate`. The `oracle` /
+ * `oraclePk` exports are now backed by the Radiant-native `PriceOracle`
+ * (see `examples/PriceOracle.ts`); they require `await initFixtures()`
+ * before use, same as the address exports.
  */
 import {
+  bigIntToScriptNumber,
   encodeBase58AddressFormat,
   encodePrivateKeyWif,
   instantiateSecp256k1,
+  Secp256k1,
 } from '@bitauth/libauth';
 import { hash160, sha256 } from '@radiantscript/utils';
 import { Network } from '../../src/interfaces.js';
@@ -88,23 +90,52 @@ export async function initFixtures(): Promise<void> {
   aliceAddress = encodeBase58AddressFormat(sha256Adapter, p2pkhVersion, alicePkh);
   bobAddress = encodeBase58AddressFormat(sha256Adapter, p2pkhVersion, bobPkh);
 
+  oracleSecp = secp;
+  oraclePk = bob.publicKey;
+
   initialised = true;
 }
 
-// E2E-only legacy exports. These previously used bitbox-sdk; they are kept
-// for source-compatibility with the e2e suites (which require a Radiant
-// node and are not part of the standard unit-test run). Importing the e2e
-// stubs in a unit test does not crash module load, but *calling* them
-// will throw loudly.
-const e2eOnly = (name: string): never => {
-  throw new Error(
-    `${name} requires a Radiant-aware oracle implementation; rewrite off bitbox-sdk before use (see SECURITY_AUDIT_REPORT.md §3.13).`,
-  );
-};
+// ---------------------------------------------------------------------------
+// Price oracle (Radiant-native).
+//
+// This is the same construction as `examples/PriceOracle.ts`, inlined here
+// so the `cashscript` package's tsconfig — which scopes to `src/**` +
+// `test/**` — doesn't need to reach across the monorepo into `examples/`.
+//
+// Bob's keypair doubles as the oracle's signing key. Both `oracle.createMessage`
+// and `oracle.signMessage` are synchronous; the WASM secp256k1 backend is
+// stashed during `initFixtures()`. Calling either before `initFixtures()`
+// returns throws loudly to surface ordering bugs.
+// ---------------------------------------------------------------------------
+let oracleSecp: Secp256k1 | undefined;
+export let oraclePk: Uint8Array = bob.publicKey;
+
+function encodeOracleScriptNum4(n: number): Uint8Array {
+  const encoded = bigIntToScriptNumber(BigInt(n));
+  if (encoded.length > 4) {
+    throw new Error(`oracle: value ${n} does not fit in a 4-byte script number`);
+  }
+  if (encoded.length === 4 && (encoded[3] & 0x80) !== 0) {
+    throw new Error(`oracle: value ${n} sign-bit collides with 4-byte width`);
+  }
+  const out = new Uint8Array(4);
+  out.set(encoded, 0);
+  return out;
+}
+
 export const oracle = {
   keypair: bob,
-  createMessage: (_blockHeight: number, _price: number): Buffer => e2eOnly('PriceOracle.createMessage'),
-  signMessage: (_msg: Buffer): Buffer => e2eOnly('PriceOracle.signMessage'),
+  createMessage(blockHeight: number, price: number): Uint8Array {
+    const out = new Uint8Array(8);
+    out.set(encodeOracleScriptNum4(blockHeight), 0);
+    out.set(encodeOracleScriptNum4(price), 4);
+    return out;
+  },
+  signMessage(message: Uint8Array): Uint8Array {
+    if (!oracleSecp) {
+      throw new Error('oracle: call await initFixtures() before signMessage');
+    }
+    return oracleSecp.signMessageHashSchnorr(BOB_PK_BIN, sha256(message));
+  },
 };
-export const oraclePk = bobPk;
-export const bitbox: never = undefined as unknown as never;

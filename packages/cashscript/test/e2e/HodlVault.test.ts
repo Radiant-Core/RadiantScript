@@ -1,21 +1,25 @@
 import { Contract, SignatureTemplate, ElectrumNetworkProvider } from '../../src/index.js';
 import {
-  alicePk,
   alice,
-  oraclePk,
+  initFixtures,
   oracle,
 } from '../fixture/vars.js';
+import * as vars from '../fixture/vars.js';
 import { getTxOutputs } from '../test-util.js';
 import { FailedRequireError, Reason } from '../../src/Errors.js';
 
 describe('HodlVault', () => {
   let hodlVault: Contract;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    // Derive secp256k1 public keys and oracle backend asynchronously. The
+    // `alicePk` / `oraclePk` named imports would be the zero-byte module-load
+    // placeholders here, so read them off the namespace re-export after init.
+    await initFixtures();
     // eslint-disable-next-line global-require
     const artifact = require('../fixture/hodl_vault.json');
     const provider = new ElectrumNetworkProvider();
-    hodlVault = new Contract(artifact, [alicePk, oraclePk, 597000, 30000], provider);
+    hodlVault = new Contract(artifact, [vars.alicePk, vars.oraclePk, 597000, 30000], provider);
     console.log(hodlVault.address);
   });
 

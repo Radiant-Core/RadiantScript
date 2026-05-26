@@ -12,6 +12,8 @@ export { Argument } from './Argument.js';
 export { default as SignatureTemplate } from './SignatureTemplate.js';
 export { Artifact, AbiFunction, AbiInput } from '@radiantscript/utils';
 export * as utils from '@radiantscript/utils';
+// Re-export commonly used crypto functions for convenience
+export { hash160, hash256, sha256 } from '@radiantscript/utils';
 export {
   Utxo,
   Recipient,

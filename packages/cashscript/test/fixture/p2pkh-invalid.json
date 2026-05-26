@@ -24,7 +24,7 @@
   "source": "contract P2PKH(bytes20 pkh) {\n    // Require pk to match stored pkh and signature to match\n    function spend(pubkey pk, sig s) {\n        require(hash160(pk) == pkh);\n        require(checkSig(s, pk));\n    }\n}\n",
   "networks": {
     "testnet": {
-      "bchtest:ppzllwzk775qk86zfskzyzae7pa9h4dvzcfezpsdkl": "ffd7616dccb66109ac840cf9484e870ecac5e7fe OP_1 OP_PICK OP_HASH160 OP_1 OP_PICK OP_EQUAL OP_VERIFY OP_2 OP_PICK OP_2 OP_PICK OP_CHECKSIG OP_VERIFY OP_DROP OP_DROP OP_DROP OP_1"
+      "2NGZzK76REJv8xuytvnQHwAQXURTBcD4b33": "ffd7616dccb66109ac840cf9484e870ecac5e7fe OP_1 OP_PICK OP_HASH160 OP_1 OP_PICK OP_EQUAL OP_VERIFY OP_2 OP_PICK OP_2 OP_PICK OP_CHECKSIG OP_VERIFY OP_DROP OP_DROP OP_DROP OP_1"
     }
   },
   "compiler": {

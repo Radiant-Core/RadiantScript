@@ -1,4 +1,4 @@
-import { binToHex } from '@bitauth/libauth';
+import { binToHex, hexToBin } from '@bitauth/libauth';
 import {
   AbiFunction,
   Artifact,
@@ -9,6 +9,7 @@ import {
   Script,
   scriptToBytecode,
 } from '@radiantscript/utils';
+import { buildStatefulOutput } from './RadiantHelpers.js';
 import { Transaction } from './Transaction.js';
 import { Argument, encodeArgument } from './Argument.js';
 import { Utxo } from './interfaces.js';
@@ -91,6 +92,34 @@ export class Contract {
 
   getRedeemScriptHex(): string {
     return binToHex(scriptToBytecode(this.redeemScript));
+  }
+
+  /**
+   * Build a stateful output with updated state data for transferring ownership.
+   *
+   * Stateful contracts (like FungibleToken, domain names, wave names) store the
+   * owner's identity in the UTXO's state section. When transferring to a new
+   * owner, the output MUST include the new owner's identity (e.g., pkh) in its
+   * state section, otherwise the new owner will not be able to sign future
+   * transactions.
+   *
+   * Usage:
+   * ```typescript
+   * const newOwnerPkh = hash160(newOwnerPubKey);
+   * const statefulOutput = contract.buildStatefulOutput(newOwnerPkh);
+   *
+   * await contract.functions
+   *   .transfer(currentOwnerPk, new SignatureTemplate(currentOwnerPrivKey))
+   *   .to(statefulOutput, amount)  // Pass Uint8Array, not address string!
+   *   .send();
+   * ```
+   *
+   * @param stateData  The new state bytes (e.g., 20-byte pkh of new owner)
+   * @returns          A Uint8Array to use as the output's lockingBytecode
+   */
+  buildStatefulOutput(stateData: Uint8Array): Uint8Array {
+    const codeScript = hexToBin(this.getRedeemScriptHex());
+    return buildStatefulOutput(stateData, codeScript);
   }
 
   private createFunction(abiFunction: AbiFunction, selector?: number): ContractFunction {

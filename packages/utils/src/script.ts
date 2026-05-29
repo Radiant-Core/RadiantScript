@@ -275,67 +275,16 @@ export function generateRedeemScript(baseScript: Script, encodedArgs: Script): S
   return replaceBytecodeNop([...encodedArgs, ...baseScript]);
 }
 
-export function optimiseBytecode(script: Script, runs: number = 1000): Script {
-  const optimisations = OptimisationsEquivFile
-    // Split by line and filter all line comments (#)
-    .split('\n')
-    .map((equiv) => equiv.trim())
-    .filter((equiv) => !equiv.startsWith('#'))
-    // Join back the lines, and split on semicolon
-    .join('')
-    .split(';')
-    // Parse all optimisations in .equiv file
-    .map((equiv) => equiv.trim())
-    .map((equiv) => equiv.split('<=>').map((part) => part.trim()))
-    .filter((equiv) => equiv.length === 2);
-
-  for (let i = 0; i < runs; i += 1) {
-    const oldScript = script;
-    script = replaceOps(script, optimisations);
-
-    // Break on fixed point
-    if (scriptToAsm(oldScript) === scriptToAsm(script)) break;
-  }
-
-  return script;
-}
-
-function replaceOps(script: Script, optimisations: string[][]): Script {
-  let asm = scriptToAsm(script);
-
-  // Apply all optimisations in the cashproof file
-  optimisations.forEach(([pattern, replacement]) => {
-    asm = asm.replace(new RegExp(pattern, 'g'), replacement);
-  });
-
-  // Add optimisations that are not compatible with CashProof
-  // CashProof can't prove OP_IF without parameters
-  asm = asm.replace(/OP_NOT OP_IF/g, 'OP_NOTIF');
-  // CashProof can't prove OP_CHECKMULTISIG without specifying N
-  asm = asm.replace(/OP_CHECKMULTISIG OP_VERIFY/g, 'OP_CHECKMULTISIGVERIFY');
-  // CashProof can't prove bitwise operators
-  asm = asm.replace(/OP_SWAP OP_AND/g, 'OP_AND');
-  asm = asm.replace(/OP_SWAP OP_OR/g, 'OP_OR');
-  asm = asm.replace(/OP_SWAP OP_XOR/g, 'OP_XOR');
-  asm = asm.replace(/OP_DUP OP_AND/g, '');
-  asm = asm.replace(/OP_DUP OP_OR/g, '');
-
-  // Remove any double spaces as a result of opcode removal
-  asm = asm.replace(/\s+/g, ' ').trim();
-
-  return asmToScript(asm);
-}
-
 /* ------------------------------------------------------------------ *
  * Opcode-list optimisation pass (audit §3.10)                        *
  *                                                                    *
- * Replaces the legacy `scriptToAsm -> regex -> asmToScript` pipeline *
- * above. The audit flagged the regex pass as fragile to future       *
- * grammar additions whose mnemonic is a prefix of another opcode     *
- * (e.g. a careless `.equiv` rule could mis-rewrite). This pass       *
- * operates directly on the opcode list: rules are parsed once at     *
- * module load into structured `(lhs Op[], rhs Op[])` pairs, and      *
- * matches only at exact opcode equality (never on data pushes).      *
+ * Replaces the legacy `scriptToAsm -> regex -> asmToScript` pipeline.*
+ * The audit flagged the regex pass as fragile to future grammar      *
+ * additions whose mnemonic is a prefix of another opcode (e.g. a     *
+ * careless `.equiv` rule could mis-rewrite). This pass operates      *
+ * directly on the opcode list: rules are parsed once at module load  *
+ * into structured `(lhs Op[], rhs Op[])` pairs, and match only at    *
+ * exact opcode equality (never on data pushes).                      *
  * ------------------------------------------------------------------ */
 
 interface OptimisationRule {
@@ -403,6 +352,16 @@ function parseOptimisationRules(equivFile: string): OptimisationRule[] {
 // Hardcoded rules that live outside `cashproof-optimisations.equiv`
 // because CashProof can't model them (the regex pass kept these inline at
 // the bottom of `replaceOps`; we lift them into the same structured form).
+//
+// The last two `OP_SWAP OP_*VERIFY` rules are not in the original regex
+// list — they're the rules the regex pipeline was *accidentally* applying
+// via prefix collision (the substring `OP_SWAP OP_EQUAL` matched the
+// prefix of `OP_SWAP OP_EQUALVERIFY` after a prior `OP_EQUAL OP_VERIFY`
+// merge, silently dropping the redundant SWAP). They're semantically
+// valid (EQUAL and NUMEQUAL are commutative, so a SWAP before them is
+// a no-op; the VERIFY-merged forms inherit that). Stating them
+// explicitly preserves the optimisation without depending on the
+// regex's mis-feature.
 const HARDCODED_RULES: OptimisationRule[] = [
   { lhs: [Op.OP_NOT, Op.OP_IF], rhs: [Op.OP_NOTIF], source: 'OP_NOT OP_IF <=> OP_NOTIF' },
   { lhs: [Op.OP_CHECKMULTISIG, Op.OP_VERIFY], rhs: [Op.OP_CHECKMULTISIGVERIFY], source: 'OP_CHECKMULTISIG OP_VERIFY <=> OP_CHECKMULTISIGVERIFY' },
@@ -411,6 +370,8 @@ const HARDCODED_RULES: OptimisationRule[] = [
   { lhs: [Op.OP_SWAP, Op.OP_XOR], rhs: [Op.OP_XOR], source: 'OP_SWAP OP_XOR <=> OP_XOR' },
   { lhs: [Op.OP_DUP, Op.OP_AND], rhs: [], source: 'OP_DUP OP_AND <=>' },
   { lhs: [Op.OP_DUP, Op.OP_OR], rhs: [], source: 'OP_DUP OP_OR <=>' },
+  { lhs: [Op.OP_SWAP, Op.OP_EQUALVERIFY], rhs: [Op.OP_EQUALVERIFY], source: 'OP_SWAP OP_EQUALVERIFY <=> OP_EQUALVERIFY' },
+  { lhs: [Op.OP_SWAP, Op.OP_NUMEQUALVERIFY], rhs: [Op.OP_NUMEQUALVERIFY], source: 'OP_SWAP OP_NUMEQUALVERIFY <=> OP_NUMEQUALVERIFY' },
 ];
 
 // Parsed at module load. If `OptimisationsEquivFile` contains an unknown
@@ -455,11 +416,38 @@ function applyOpcodeListRule(script: Script, rule: OptimisationRule): Script {
   return changed ? result : script;
 }
 
-// New entry point. Walks the rule list (cashproof rules first, hardcoded
-// rules last — matching the legacy regex order) and re-runs to a fixed
-// point. `runs` caps the iteration count as a runaway safety; reaching
-// it would indicate a non-converging rule set (rejected at parse time).
-export function optimiseBytecodeOpcodeList(script: Script, runs: number = 1000): Script {
+// The codegen emits `encodeInt(0)` for the script-int 0, which produces
+// an empty `Uint8Array` rather than the numeric `Op.OP_0`. Both serialize
+// to the same byte (0x00), but the rule matcher only equates numbers,
+// so an empty-data push and `Op.OP_0` are otherwise indistinguishable
+// for optimisation purposes. The legacy regex pipeline papered over this
+// by round-tripping through ASM (where libauth's disassembler aliases
+// 0x00 to "OP_0"); we do it explicitly here. No other small-int
+// (`OP_1`..`OP_16`) needs canonicalisation: their `encodeInt` output is
+// a 1-byte push (`[0x01, 0xNN]`), which is *not* bytewise equivalent to
+// the corresponding small-int opcode (`OP_N = 0x50 + N`), so the regex
+// pipeline never collapsed those either.
+function canonicaliseScript(script: Script): Script {
+  let changed = false;
+  const result: Script = new Array(script.length);
+  for (let i = 0; i < script.length; i += 1) {
+    const el = script[i];
+    if (el instanceof Uint8Array && el.length === 0) {
+      result[i] = Op.OP_0;
+      changed = true;
+    } else {
+      result[i] = el;
+    }
+  }
+  return changed ? result : script;
+}
+
+// Walks the rule list (cashproof rules first, hardcoded rules last —
+// matching the original ordering) and re-runs to a fixed point. `runs`
+// caps the iteration count as a runaway safety; reaching it would
+// indicate a non-converging rule set (rejected at parse time).
+export function optimiseBytecode(script: Script, runs: number = 1000): Script {
+  script = canonicaliseScript(script);
   for (let i = 0; i < runs; i += 1) {
     let iterationChanged = false;
     for (const rule of OPTIMISATION_RULES) {

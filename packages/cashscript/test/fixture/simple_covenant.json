@@ -1,17 +1,17 @@
 {
-  "contractName": "Covenant",
-  "constructorInputs": [],
+  "version": 9,
+  "compilerVersion": "cashc 0.7.0",
+  "contract": "Covenant",
   "abi": [
     {
+      "type": "function",
       "name": "spend",
-      "inputs": []
+      "params": []
+    },
+    {
+      "type": "constructor",
+      "params": []
     }
   ],
-  "bytecode": "OP_TXVERSION OP_2 OP_GREATERTHANOREQUAL",
-  "source": "contract Covenant() {\n    function spend() {\n        require(tx.version >= 2);\n    }\n}\n",
-  "compiler": {
-    "name": "cashc",
-    "version": "0.7.0"
-  },
-  "updatedAt": "2021-11-30T13:26:08.090Z"
+  "asm": "OP_TXVERSION OP_2 OP_GREATERTHANOREQUAL"
 }

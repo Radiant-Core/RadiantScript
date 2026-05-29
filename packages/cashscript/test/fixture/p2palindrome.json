@@ -1,22 +1,22 @@
 {
-  "contractName": "P2Palindrome",
-  "constructorInputs": [],
+  "version": 9,
+  "compilerVersion": "cashc 0.7.0",
+  "contract": "P2Palindrome",
   "abi": [
     {
+      "type": "function",
       "name": "spend",
-      "inputs": [
+      "params": [
         {
           "name": "palindrome",
           "type": "string"
         }
       ]
+    },
+    {
+      "type": "constructor",
+      "params": []
     }
   ],
-  "bytecode": "OP_DUP OP_REVERSEBYTES OP_EQUAL",
-  "source": "contract P2Palindrome() {\n    function spend(string palindrome) {\n        require(palindrome.reverse() == palindrome);\n    }\n}\n",
-  "compiler": {
-    "name": "cashc",
-    "version": "0.7.0"
-  },
-  "updatedAt": "2021-11-30T13:26:07.514Z"
+  "asm": "OP_DUP OP_REVERSEBYTES OP_EQUAL"
 }

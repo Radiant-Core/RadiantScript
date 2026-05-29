@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^1.0.0;
 
 contract FungibleToken(bytes36 REF, bytes20 PKH)
 function (sig s, pubkey pk) {

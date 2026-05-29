@@ -200,4 +200,107 @@ Radiant inherits Bitcoin's legacy base58check address scheme (no bech32 / no cas
 
 ---
 
-*End of audit.*
+## 8. Re-audit Delta — 2026-05-28
+
+Three remediation commits landed between 2026-05-23 and 2026-05-28 (`71a746a`, `7a23ef2`, `7aa1684`). This section records the verified status of every prior finding and lists new issues uncovered while verifying.
+
+### 8.1 Status of prior findings
+
+| # | Finding | Status | Evidence |
+|---|---|---|---|
+| §2.1 | Compiler version `0.1.0` mismatch | **FIXED** | `packages/cashc/src/index.ts:9` exports `'1.1.0-v2'` matching `package.json`. `update-version.ts` still rewrites the constant. |
+| §2.2 | Legacy `.cash` pragmas | **FIXED** | All six files relocated to `examples/legacy/`; root `examples/` no longer contains `.cash`. |
+| §2.3 | `TokenSwap.executeSwap` doesn't enforce swap | **FIXED (with caveat)** | `examples/radiant/TokenSwap.rxd:14-19,67-76` now pins `outputs[0].lockingBytecode == LockingBytecodeP2PKH(hash160(makerPk))` and bounds the output value. Header comment documents Radiant introspection limits. |
+| §2.4 | `NFT.transferWithData` ignores `newData` | **FIXED** | `examples/radiant/NFT.rxd:48` now requires `tx.outputs[0].stateScript == newData`. |
+| §2.5 | `MultiSigVault` `minAmount` taker-controlled | **FIXED** | `examples/radiant/MultiSigVault.rxd:22` promotes `minAmount` to `int constant`. |
+| §2.6 | `FungibleToken` not actually fungible | **PARTIAL** | Redesigned to per-holder pkh-in-state model (`examples/radiant/FungibleToken.rxd:26-44`). Burn now bounded (`>0` and `<= inputTokens`). **Residual issue — see §8.2/1.** |
+| §3.1 | `Transaction.send()` polling not cancellable | **FIXED** | `Transaction.ts:55-60` adds `SendOptions { signal?: AbortSignal; maxRetries?: number }`. Abort checked at `Transaction.ts:334`. |
+| §3.2 | Default 100 sat/byte fee clamp | **OK / DOCUMENTED** | JSDoc at `Transaction.ts:159-168` now explicit. |
+| §3.3 | P2SH-only address derivation | **PARTIAL** | `utils.ts:246` parameter renamed `_network` (acknowledges it's unused). P2SH bytecode is genuinely network-agnostic, so no live bug, but dead param remains. |
+| §3.4 | Single mainnet electrum, missing testnet | **FIXED** | `ElectrumNetworkProvider.ts:64-72` adds fallback `82.180.136.182:50012`. Testnet throws clear error directing users to override. |
+| §3.5 | `ready()` no timeout | **FIXED** | `ElectrumNetworkProvider.ts:151-154` races `ready()` against `REQUEST_TIMEOUT_MS`. |
+| §3.6 | `SignatureTemplate` ignores network | **FIXED** | Constructor now accepts `network` and `decodeWif` throws on mismatch (`SignatureTemplate.ts:8-21,50-65`). |
+| §3.7 | `amount: number` lossy above 2^53 sats | **PARTIAL** | Type still `number` in `interfaces.ts`. Runtime guard added: `validateAmount` clamps to `MAX_SAFE_SATOSHIS` before `BigInt()` conversion (`Transaction.ts:437-447`). No overflow path, but API still lossy. |
+| §3.8 | Artifact validation weak | **FIXED** | `Contract.ts:155-195` adds `validateArtifact()` with explicit `typeof` guards on `contract`/`asm`/ABI entries; called at `Contract.ts:40`. |
+| §3.9 | `replaceBytecodeNop` first-NOP / VarInt boundary | **PARTIAL** | Bounds-checks added (`script.ts:237-262`). Boundary `bytecodeSize == 252` now takes the `+1` path correctly (`script.ts:266` uses `> 252`). Still uses first-OP_NOP heuristic without collision detection. |
+| §3.10 | Optimiser regex-on-ASM | **OPEN** | `script.ts:303-327` still constructs `new RegExp` from external `.equiv` patterns. No prefix-collision tests added. |
+| §3.11 | Source map debug exposure | **OK** | `--debug` still opt-in in `cashc-cli.ts`. |
+| §3.12 | Two lock files / mixed pkg manager | **FIXED** | `yarn.lock` deleted, `lerna.json` set to `npmClient: "npm"`. Docs updated. **Exception:** `Dockerfile:11,18` still uses `yarn` — see §8.2/3. |
+| §3.13 | Cashaddr leakage | **MOSTLY FIXED** | Tests, fixtures, and key derivation migrated to libauth + base58. **Open residue:** `NetworkProvider.ts:11` JSDoc still reads "CashAddress". |
+
+### 8.2 New findings (current code)
+
+1. **[MED] `FungibleToken.transfer()` only constrains `outputs[0]`, but `refValueSum` aggregates across all outputs** — `examples/radiant/FungibleToken.rxd:38-44` enforces `tx.inputs.refValueSum == tx.outputs.refValueSum` and pins `outputs[0].codeScript`, but says nothing about outputs 1..n. A holder can route part of the token reference into a non-FungibleToken codeScript on `outputs[1]`, which still satisfies refValueSum conservation but escapes the contract's transfer rules. The redesign is much better than the v1 owner-locked model, but the example still teaches an incomplete pattern.
+   - **Fix:** require `forEach` over outputs carrying `$tokenRef` to share the same codeScript, or document the constraint that all carrier outputs must use the same contract. Until then, label this an illustrative example.
+
+2. **[MED] `splitStatefulBytecode` push-length checks let crafted pushes hide a real `OP_STATESEPARATOR`** — `packages/cashscript/src/RadiantHelpers.ts:158-178`. For each push opcode (0x01–0x4b, 0x4c, 0x4d, 0x4e) the function increments `i` by `1 + pushLen` (or similar) without verifying that `i + 1 + pushLen <= lockingBytecode.length`. The OP_PUSHDATA4 branch (line 174) compares `pushLen > lockingBytecode.length` — loose: a `pushLen` of e.g. `0xFFFF_FFF0` skips past every subsequent byte, and the while loop simply exits returning `null`. There is no OOB crash (JS reads beyond `length` return undefined), but an attacker who controls a locking bytecode can construct a push whose claimed length carries the cursor past a *real* state separator, so `splitStatefulBytecode` returns `null` and the caller mis-classifies the UTXO as stateless. Fix: bound each `i +=` advance against `lockingBytecode.length` and treat over-advance as malformed.
+
+3. **[MED] `Dockerfile` is on EOL Node 10 + Nginx 1.17.0 (2019) + still uses `yarn`** — `Dockerfile:2,11,18,23` contradicts the §3.12 npm-only standardization, and the base images haven't received security updates in years. Only affects the website (Docusaurus); SDK consumers unaffected. Also `ADD "http://worldtimeapi.org/api/timezone/Europe/Amsterdam.txt" skipCache` (lines 7, 26) injects an external dependency into builds — if that host is compromised, builds embed attacker-controlled bytes (low risk: only used as cache-bust). Fix: bump base images, switch to `npm ci`, drop the worldtimeapi cache-bust.
+
+4. **[LOW] `update-version.ts` shell-injects `process.argv[2]`** — `update-version.ts:9` interpolates the unvalidated version arg directly into a shell command via `execSync`. A developer typo like `update-version '1.0.0; rm -rf ~'` would execute. Not internet-reachable; developer release script only. Fix: validate against semver regex before interpolation, or pass args as an array via `execFileSync`.
+
+5. **[LOW] `.travis.yml` still present and contradicts active CI** — Root `.travis.yml` runs `npm test` but `.github/workflows/ci.yml` is the actual CI. Dead config files cause confusion; recommend deletion.
+
+6. **[LOW] `examples/webapp/src/App.tsx` hard-codes the literal string `'CashScript'` as a seed/example** — Misleading branding for example code in the published repo; trivial to fix during the broader rebrand sweep.
+
+7. **[LOW] No test asserts `update-version.ts` keeps `packages/cashc/src/index.ts` in sync** — Human error at release time can re-introduce §2.1. Either generate the constant at build time from `package.json` (preferred), or add a CI assertion that the two values match.
+
+8. **[LOW] `NetworkProvider.ts:11` JSDoc still mentions "CashAddress"** — Last cashaddr leak; cosmetic but worth scrubbing.
+
+### 8.3 New showstoppers
+
+None. The original §2.1–§2.5 showstoppers are all fixed. §2.6 (`FungibleToken`) is functionally much better but still teaches a slightly incomplete pattern; the residual issue is a template-quality concern, not a deployment blocker, *provided the README disclaimer (added in `7a23ef2`) is preserved.*
+
+### 8.4 Recommended next remediation order
+
+1. Tighten `splitStatefulBytecode` push-length bounds (§8.2/2).
+2. Constrain all carrier outputs in `FungibleToken.transfer()` (§8.2/1) — or relabel as illustrative.
+3. Refresh `Dockerfile` (§8.2/3).
+4. Sweep the remaining cashaddr JSDoc (§3.13 residue) and the `_network` dead parameter (§3.3).
+5. Type `amount` as `number | bigint` in `interfaces.ts` (§3.7) — runtime guard is in place but the public type still constrains callers to lossy `number`.
+6. Replace the regex-on-ASM optimiser with an opcode-list pass (§3.10).
+7. Replace `hash.js` with libauth-native hashes (§4 carry-over).
+
+---
+
+*End of 2026-05-28 re-audit delta.*
+
+---
+
+## 9. 2026-05-28 Remediation Log
+
+Code changes made the same day to close out the §8 follow-up list. Test counts at start of session: 270 passing + 56 failing across cashc (pragma drift) + 53 passing + 9 schema failures across cashscript Contract.test + ~200 typecheck errors blocking the cashscript build. End of session: **326 root tests + 61 cashscript unit tests = 387 passing, 1 failing**, and the cashscript package typechecks cleanly. Highlights:
+
+### 9.1 Security correctness
+- **§8.2/2 FIXED — `splitStatefulBytecode` push-length bounds** ([RadiantHelpers.ts:158-186](packages/cashscript/src/RadiantHelpers.ts:158)). Every push branch (direct, OP_PUSHDATA1/2/4) now verifies `i + header + payload <= bytecode.length` before advancing. Four new regression tests in [RadiantHelpers.test.ts](packages/cashscript/test/RadiantHelpers.test.ts) cover the crafted-push case where the old code would silently skip past a real `OP_STATESEPARATOR`.
+- **§3.6 follow-up FIXED — `SignatureTemplate.decodeWif` was reading the wrong field** ([SignatureTemplate.ts:50-71](packages/cashscript/src/SignatureTemplate.ts:50)). The §3.6 fix asserted `result.network`, but libauth's `decodePrivateKeyWif` returns `result.type` (`'mainnet' | 'testnet' | 'mainnet-uncompressed' | 'testnet-uncompressed'`). The check was a no-op until now. Comparison now strips the `-uncompressed` suffix and matches against the expected network. Without this, the §3.6 network guard had been silently disabled since it was added.
+- **§3.4 follow-up FIXED — `ElectrumNetworkProvider` referenced a non-existent `ElectrumTransport.SSL`** ([ElectrumNetworkProvider.ts:72](packages/cashscript/src/network/ElectrumNetworkProvider.ts:72)). electrum-cash exposes `TCP_TLS` (scheme `'tcp_tls'`), not `SSL`. The fallback server entry would have thrown at runtime. Now correctly references `TCP_TLS`.
+- **`Contract` was indexing `this.functions[undefined]` for the constructor entry** ([Contract.ts:68-78](packages/cashscript/src/Contract.ts:68)). The ABI mixes function entries (with `name`) and a constructor entry (without). The previous `forEach` silently set `functions[undefined] = ...`. Now filters to `type === 'function'` before iterating.
+
+### 9.2 Build / tooling / CI hardening
+- **§8.2/4 FIXED — `update-version.ts` shell injection** ([update-version.ts](update-version.ts)). Validates input against semver regex and uses `execFileSync` (array args) instead of `execSync` template-interpolating into a shell.
+- **§8.2/3 FIXED — `Dockerfile` modernised** ([Dockerfile](Dockerfile)). `node:10` → `node:18-alpine`, `nginx:1.17.0-alpine` → `nginx:stable-alpine`, dropped the `worldtimeapi.org` cache-bust (replaced with a `CACHE_BUST` build arg), added `--frozen-lockfile` for reproducibility.
+- **§8.2/5 FIXED — Deleted stale `.travis.yml`**. `.github/workflows/ci.yml` is the canonical CI.
+- **§2.1 hardened — CI guard prevents version drift** ([ci.yml `version-sync` job](.github/workflows/ci.yml)). Asserts `packages/cashc/src/index.ts`'s `version` constant matches `packages/cashc/package.json`. Fails the build with a clear message if they diverge, so a future release that forgets to run `update-version.ts` cannot regress §2.1.
+- **`bip68` type shim** ([packages/cashscript/src/types/bip68.d.ts](packages/cashscript/src/types/bip68.d.ts)) covers the two helpers RadiantScript actually uses.
+
+### 9.3 Test-suite cleanup
+- **24 cashc fixture pragmas bumped** from `^0.1.0` (rejecting the current 1.x compiler) to `^1.0.0` across `valid-contract-files/` and the non-VersionError sub-directories. VersionError fixtures left alone so they continue to test rejection paths.
+- **20 artifact-version strings bumped** from `"rxdc 0.1.0"` → `"rxdc 1.1.0-v2"` in [`packages/cashc/test/generation/fixtures.ts`](packages/cashc/test/generation/fixtures.ts).
+- **`split_size.cash` fixture updated for V2 fork** to expect `OP_2DIV` instead of `OP_DIV` (the compiler now emits the optimised opcode added in commit `ac69ad2`).
+- **10 cashscript JSON fixtures ported from CashScript v0.7 schema to current Radiant schema**: `contractName → contract`, `bytecode → asm`, `abi[].inputs → abi[].params`, hoisted `constructorInputs` into an `abi[]` `type: 'constructor'` entry. Test file references updated to match. Ported via a one-off script (not retained — fixtures are static).
+- **Errors.ts `TypeError` constructor now accepts a single-arg "raw message" form** so validation errors added in earlier passes (hex-length cap, byte-array size cap, etc.) compile cleanly. Backwards compatible with the two-arg `(actualType, expectedType)` form.
+- **`AbiFunction.covenant` declared optional** in [`packages/utils/src/artifact.ts`](packages/utils/src/artifact.ts). The legacy BCH covenant flag is never set by the Radiant compiler, but `Transaction.ts` size-estimation code reads it; this makes the read type-safe without changing runtime behaviour.
+- **`Uint8Array` variance**: Transaction.ts cast `unlockingBytecode` from `Uint8Array<ArrayBufferLike>` to `Uint8Array<ArrayBuffer>` with a comment explaining the libauth 1.19 narrowing — owned-buffer guarantee holds in practice.
+
+### 9.4 What's still open
+- **§2.6/§8.2/1 (FungibleToken `transfer()` only pins `outputs[0]`)** — flagged in §8.2 and *not yet fixed*. Needs either a `forEach` over all outputs carrying `$tokenRef` (constrain them to share the same `codeScript`) or an explicit "illustrative only" label. Doesn't block any test.
+- **§3.7 (amount type still `number`)** — runtime guard is in place via `MAX_SAFE_SATOSHIS`. Lifting the public API to accept `number | bigint` is a non-trivial refactor across `Output`, `Recipient`, `to()`, and `Transaction.send`.
+- **§3.10 (regex-on-ASM optimiser)** — still ASM-string-based in [`packages/utils/src/script.ts`](packages/utils/src/script.ts). Refactoring to an opcode-list pass is its own project.
+- **`hash.js` migration** — still used in [`packages/utils/src/hash.ts`](packages/utils/src/hash.ts).
+- **One Contract.test.ts case fails offline** — `Contract › getBalance › should return balance for existing contract` queries a live Radiant Electrum endpoint for funds at a known address. Effectively an e2e test; not introduced by this session.
+- **8 pre-existing test files use the old grammar** for fixture sources (`transfer_with_timeout.cash`, etc. under `packages/cashscript/test/fixture/`) but the JSON artifacts have been ported. The `.cash` sources are stale documentation only — tests load the JSON, not the `.cash`.
+
+---
+
+*End of 2026-05-28 remediation log.*

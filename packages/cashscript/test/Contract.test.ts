@@ -34,7 +34,7 @@ describe('Contract', () => {
       expect(
         () => new Contract({ ...artifact, constructorInputs: undefined }, [], provider),
       ).toThrow();
-      expect(() => new Contract({ ...artifact, contractName: undefined }, [], provider)).toThrow();
+      expect(() => new Contract({ ...artifact, contract: undefined }, [], provider)).toThrow();
     });
 
     it('should create new P2PKH instance', () => {
@@ -45,7 +45,7 @@ describe('Contract', () => {
 
       expect(typeof instance.address).toBe('string');
       expect(typeof instance.functions.spend).toBe('function');
-      expect(instance.name).toEqual(artifact.contractName);
+      expect(instance.name).toEqual(artifact.contract);
     });
 
     it('should create new TransferWithTimeout instance', () => {
@@ -58,7 +58,7 @@ describe('Contract', () => {
       expect(typeof instance.address).toBe('string');
       expect(typeof instance.functions.transfer).toBe('function');
       expect(typeof instance.functions.timeout).toBe('function');
-      expect(instance.name).toEqual(artifact.contractName);
+      expect(instance.name).toEqual(artifact.contract);
     });
 
     it('should create new HodlVault instance', () => {
@@ -70,7 +70,7 @@ describe('Contract', () => {
 
       expect(typeof instance.address).toBe('string');
       expect(typeof instance.functions.spend).toBe('function');
-      expect(instance.name).toEqual(artifact.contractName);
+      expect(instance.name).toEqual(artifact.contract);
     });
 
     it('should create new Mecenas instance', () => {
@@ -83,7 +83,7 @@ describe('Contract', () => {
       expect(typeof instance.address).toBe('string');
       expect(typeof instance.functions.receive).toBe('function');
       expect(typeof instance.functions.reclaim).toBe('function');
-      expect(instance.name).toEqual(artifact.contractName);
+      expect(instance.name).toEqual(artifact.contract);
     });
   });
 

@@ -1,4 +1,4 @@
-pragma radiantscript ^0.1.0;
+pragma radiantscript ^1.0.0;
 
 contract Test() {
     return {

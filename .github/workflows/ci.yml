@@ -44,19 +44,42 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22.x'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Type check
         run: npx tsc --noEmit
+
+  version-sync:
+    # Guards audit finding §2.1: packages/cashc/src/index.ts must stay in
+    # sync with packages/cashc/package.json. The literal-in-source design
+    # is intentional (ESM has no `require`); this job catches release-time
+    # drift without restructuring the import.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Assert cashc version constants match
+        run: |
+          set -euo pipefail
+          PKG_VERSION=$(node -p "require('./packages/cashc/package.json').version")
+          SRC_VERSION=$(grep -oE "export const version = '[^']+'" packages/cashc/src/index.ts | sed -E "s/.*'([^']+)'.*/\1/")
+          echo "package.json: ${PKG_VERSION}"
+          echo "src/index.ts: ${SRC_VERSION}"
+          if [ "${PKG_VERSION}" != "${SRC_VERSION}" ]; then
+            echo "::error::cashc version drift — package.json says ${PKG_VERSION} but src/index.ts says ${SRC_VERSION}. Re-run update-version.ts before merging."
+            exit 1
+          fi

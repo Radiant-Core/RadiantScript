@@ -275,53 +275,189 @@ export function generateRedeemScript(baseScript: Script, encodedArgs: Script): S
   return replaceBytecodeNop([...encodedArgs, ...baseScript]);
 }
 
-export function optimiseBytecode(script: Script, runs: number = 1000): Script {
-  const optimisations = OptimisationsEquivFile
-    // Split by line and filter all line comments (#)
-    .split('\n')
-    .map((equiv) => equiv.trim())
-    .filter((equiv) => !equiv.startsWith('#'))
-    // Join back the lines, and split on semicolon
-    .join('')
-    .split(';')
-    // Parse all optimisations in .equiv file
-    .map((equiv) => equiv.trim())
-    .map((equiv) => equiv.split('<=>').map((part) => part.trim()))
-    .filter((equiv) => equiv.length === 2);
+/* ------------------------------------------------------------------ *
+ * Opcode-list optimisation pass (audit §3.10)                        *
+ *                                                                    *
+ * Replaces the legacy `scriptToAsm -> regex -> asmToScript` pipeline.*
+ * The audit flagged the regex pass as fragile to future grammar      *
+ * additions whose mnemonic is a prefix of another opcode (e.g. a     *
+ * careless `.equiv` rule could mis-rewrite). This pass operates      *
+ * directly on the opcode list: rules are parsed once at module load  *
+ * into structured `(lhs Op[], rhs Op[])` pairs, and match only at    *
+ * exact opcode equality (never on data pushes).                      *
+ * ------------------------------------------------------------------ */
 
-  for (let i = 0; i < runs; i += 1) {
-    const oldScript = script;
-    script = replaceOps(script, optimisations);
-
-    // Break on fixed point
-    if (scriptToAsm(oldScript) === scriptToAsm(script)) break;
-  }
-
-  return script;
+interface OptimisationRule {
+  lhs: Op[];
+  rhs: Op[];
+  source: string;
 }
 
-function replaceOps(script: Script, optimisations: string[][]): Script {
-  let asm = scriptToAsm(script);
+// Tokens like `OP_NOT`, `OP_1ADD`, ... resolve to opcode numbers via the
+// libauth OpcodesBCH enum (re-exported as `Op` above). Radiant- and
+// introspection-specific tokens (`OP_STATESEPARATOR`, `OP_INPUTINDEX`,
+// ...) are also accepted in case future rules touch them.
+function resolveOpcodeToken(token: string): Op {
+  const fromBch = (Op as unknown as Record<string, number>)[token];
+  if (typeof fromBch === 'number') return fromBch;
 
-  // Apply all optimisations in the cashproof file
-  optimisations.forEach(([pattern, replacement]) => {
-    asm = asm.replace(new RegExp(pattern, 'g'), replacement);
-  });
+  const fromIntrospection = (IntrospectionOp as unknown as Record<string, number>)[token];
+  if (typeof fromIntrospection === 'number') return fromIntrospection;
 
-  // Add optimisations that are not compatible with CashProof
-  // CashProof can't prove OP_IF without parameters
-  asm = asm.replace(/OP_NOT OP_IF/g, 'OP_NOTIF');
-  // CashProof can't prove OP_CHECKMULTISIG without specifying N
-  asm = asm.replace(/OP_CHECKMULTISIG OP_VERIFY/g, 'OP_CHECKMULTISIGVERIFY');
-  // CashProof can't prove bitwise operators
-  asm = asm.replace(/OP_SWAP OP_AND/g, 'OP_AND');
-  asm = asm.replace(/OP_SWAP OP_OR/g, 'OP_OR');
-  asm = asm.replace(/OP_SWAP OP_XOR/g, 'OP_XOR');
-  asm = asm.replace(/OP_DUP OP_AND/g, '');
-  asm = asm.replace(/OP_DUP OP_OR/g, '');
+  const fromRadiant = (RadiantOp as unknown as Record<string, number>)[token];
+  if (typeof fromRadiant === 'number') return fromRadiant;
 
-  // Remove any double spaces as a result of opcode removal
-  asm = asm.replace(/\s+/g, ' ').trim();
+  throw new Error(`Unknown opcode token in optimisation rule: "${token}"`);
+}
 
-  return asmToScript(asm);
+function parseRuleSide(side: string): Op[] {
+  const trimmed = side.trim();
+  if (trimmed === '') return [];
+  return trimmed.split(/\s+/).map(resolveOpcodeToken);
+}
+
+function parseOptimisationRules(equivFile: string): OptimisationRule[] {
+  // Strip both whole-line and inline `#` comments before joining; the legacy
+  // parser only handled whole-line comments, but inline-tolerant is safer.
+  const joined = equivFile
+    .split('\n')
+    .map((line) => line.replace(/#.*$/, '').trim())
+    .filter((line) => line.length > 0)
+    .join(' ');
+
+  const rules: OptimisationRule[] = [];
+  for (const raw of joined.split(';')) {
+    const stmt = raw.trim();
+    if (stmt === '') continue;
+    const parts = stmt.split('<=>');
+    if (parts.length !== 2) continue;
+
+    const lhs = parseRuleSide(parts[0]);
+    const rhs = parseRuleSide(parts[1]);
+
+    // An empty LHS would match every position and loop forever; reject.
+    if (lhs.length === 0) {
+      throw new Error(`Optimisation rule has empty LHS: "${stmt}"`);
+    }
+    // Rules are supposed to shrink (or be size-neutral). A growing rule
+    // would not converge in `optimiseBytecode`'s fixed-point loop.
+    if (rhs.length > lhs.length) {
+      throw new Error(`Optimisation rule would grow script: "${stmt}"`);
+    }
+    rules.push({ lhs, rhs, source: stmt });
+  }
+  return rules;
+}
+
+// Hardcoded rules that live outside `cashproof-optimisations.equiv`
+// because CashProof can't model them (the regex pass kept these inline at
+// the bottom of `replaceOps`; we lift them into the same structured form).
+//
+// The last two `OP_SWAP OP_*VERIFY` rules are not in the original regex
+// list — they're the rules the regex pipeline was *accidentally* applying
+// via prefix collision (the substring `OP_SWAP OP_EQUAL` matched the
+// prefix of `OP_SWAP OP_EQUALVERIFY` after a prior `OP_EQUAL OP_VERIFY`
+// merge, silently dropping the redundant SWAP). They're semantically
+// valid (EQUAL and NUMEQUAL are commutative, so a SWAP before them is
+// a no-op; the VERIFY-merged forms inherit that). Stating them
+// explicitly preserves the optimisation without depending on the
+// regex's mis-feature.
+const HARDCODED_RULES: OptimisationRule[] = [
+  { lhs: [Op.OP_NOT, Op.OP_IF], rhs: [Op.OP_NOTIF], source: 'OP_NOT OP_IF <=> OP_NOTIF' },
+  { lhs: [Op.OP_CHECKMULTISIG, Op.OP_VERIFY], rhs: [Op.OP_CHECKMULTISIGVERIFY], source: 'OP_CHECKMULTISIG OP_VERIFY <=> OP_CHECKMULTISIGVERIFY' },
+  { lhs: [Op.OP_SWAP, Op.OP_AND], rhs: [Op.OP_AND], source: 'OP_SWAP OP_AND <=> OP_AND' },
+  { lhs: [Op.OP_SWAP, Op.OP_OR], rhs: [Op.OP_OR], source: 'OP_SWAP OP_OR <=> OP_OR' },
+  { lhs: [Op.OP_SWAP, Op.OP_XOR], rhs: [Op.OP_XOR], source: 'OP_SWAP OP_XOR <=> OP_XOR' },
+  { lhs: [Op.OP_DUP, Op.OP_AND], rhs: [], source: 'OP_DUP OP_AND <=>' },
+  { lhs: [Op.OP_DUP, Op.OP_OR], rhs: [], source: 'OP_DUP OP_OR <=>' },
+  { lhs: [Op.OP_SWAP, Op.OP_EQUALVERIFY], rhs: [Op.OP_EQUALVERIFY], source: 'OP_SWAP OP_EQUALVERIFY <=> OP_EQUALVERIFY' },
+  { lhs: [Op.OP_SWAP, Op.OP_NUMEQUALVERIFY], rhs: [Op.OP_NUMEQUALVERIFY], source: 'OP_SWAP OP_NUMEQUALVERIFY <=> OP_NUMEQUALVERIFY' },
+];
+
+// Parsed at module load. If `OptimisationsEquivFile` contains an unknown
+// opcode token, importing this module will throw — that's intentional:
+// the audit asked for unknown tokens to be rejected, and a silently
+// no-op rule would be worse than a load-time error.
+export const OPTIMISATION_RULES: readonly OptimisationRule[] = Object.freeze([
+  ...parseOptimisationRules(OptimisationsEquivFile),
+  ...HARDCODED_RULES,
+]);
+
+// Leftmost, non-overlapping replacement (the same semantics as the
+// regex's `g` flag) of `rule.lhs` with `rule.rhs` in `script`. Matches
+// only at exact opcode equality and skips data pushes (`Uint8Array`).
+// Returns the input reference unchanged if no match was found, so the
+// fixed-point loop can compare by identity.
+function applyOpcodeListRule(script: Script, rule: OptimisationRule): Script {
+  const { lhs, rhs } = rule;
+  const result: Script = [];
+  let i = 0;
+  let changed = false;
+  while (i < script.length) {
+    if (i + lhs.length <= script.length) {
+      let matched = true;
+      for (let k = 0; k < lhs.length; k += 1) {
+        const element = script[i + k];
+        if (typeof element !== 'number' || element !== lhs[k]) {
+          matched = false;
+          break;
+        }
+      }
+      if (matched) {
+        for (const op of rhs) result.push(op);
+        i += lhs.length;
+        changed = true;
+        continue;
+      }
+    }
+    result.push(script[i]);
+    i += 1;
+  }
+  return changed ? result : script;
+}
+
+// The codegen emits `encodeInt(0)` for the script-int 0, which produces
+// an empty `Uint8Array` rather than the numeric `Op.OP_0`. Both serialize
+// to the same byte (0x00), but the rule matcher only equates numbers,
+// so an empty-data push and `Op.OP_0` are otherwise indistinguishable
+// for optimisation purposes. The legacy regex pipeline papered over this
+// by round-tripping through ASM (where libauth's disassembler aliases
+// 0x00 to "OP_0"); we do it explicitly here. No other small-int
+// (`OP_1`..`OP_16`) needs canonicalisation: their `encodeInt` output is
+// a 1-byte push (`[0x01, 0xNN]`), which is *not* bytewise equivalent to
+// the corresponding small-int opcode (`OP_N = 0x50 + N`), so the regex
+// pipeline never collapsed those either.
+function canonicaliseScript(script: Script): Script {
+  let changed = false;
+  const result: Script = new Array(script.length);
+  for (let i = 0; i < script.length; i += 1) {
+    const el = script[i];
+    if (el instanceof Uint8Array && el.length === 0) {
+      result[i] = Op.OP_0;
+      changed = true;
+    } else {
+      result[i] = el;
+    }
+  }
+  return changed ? result : script;
+}
+
+// Walks the rule list (cashproof rules first, hardcoded rules last —
+// matching the original ordering) and re-runs to a fixed point. `runs`
+// caps the iteration count as a runaway safety; reaching it would
+// indicate a non-converging rule set (rejected at parse time).
+export function optimiseBytecode(script: Script, runs: number = 1000): Script {
+  script = canonicaliseScript(script);
+  for (let i = 0; i < runs; i += 1) {
+    let iterationChanged = false;
+    for (const rule of OPTIMISATION_RULES) {
+      const next = applyOpcodeListRule(script, rule);
+      if (next !== script) {
+        script = next;
+        iterationChanged = true;
+      }
+    }
+    if (!iterationChanged) break;
+  }
+  return script;
 }

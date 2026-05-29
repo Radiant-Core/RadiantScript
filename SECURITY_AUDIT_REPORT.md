@@ -304,3 +304,28 @@ Code changes made the same day to close out the §8 follow-up list. Test counts 
 ---
 
 *End of 2026-05-28 remediation log.*
+
+---
+
+## 10. 2026-05-28 Final Remediation Pass
+
+Continued the same day with the §9.4 follow-up list. End state: **326 root + 68 cashscript unit = 394 tests passing, 0 failing**; both live-network checks live under `test/e2e/`.
+
+### 10.1 Closed in this pass
+
+- **§8.2/6 → §2.6 carry-over: FungibleToken example** ([examples/radiant/FungibleToken.rxd](examples/radiant/FungibleToken.rxd)). Rewritten in the current grammar (functions inside `return { ... }`) — the previous shape did not even compile under 1.x. `transfer()` and `burn()` now constrain every output carrying `$tokenRef` to share the FungibleToken code script via `tx.outputs.codeScriptCount(csh) == tx.outputs.refOutputCount($tokenRef)`, closing the "split into a non-FungibleToken script" escape that satisfied refValueSum alone. Value conservation switched to `codeScriptValueSum` to match the constrained output set.
+- **§8.2/6 webapp + branding** ([`examples/webapp/`](examples/webapp/)). Deleted. The webapp imported BCH-only SDKs (`bitbox-sdk`, `bitcoincashjs-lib`), hard-coded a cashaddr testnet address, linked to `explorer.bitcoin.com`, and used `cashscript ^0.7.0-next.0`. Not referenced from anywhere; Photonic Wallet is the canonical Radiant frontend.
+- **Live-network test moved to e2e** ([`packages/cashscript/test/e2e/Contract.balance.e2e.test.ts`](packages/cashscript/test/e2e/Contract.balance.e2e.test.ts)). Both `Contract › getBalance` cases hit a live Radiant Electrum endpoint and depended on real funds; they no longer block the offline unit suite.
+- **Legacy `test/e2e/old/` + `test/fixture/old/`**. Deleted. Used CashScript ^0.6.0 sources; the modern `e2e/Mecenas.test.ts` / `e2e/misc.test.ts` already cover the same contracts.
+- **§4 hash.js carry-over** ([`packages/utils/src/hash.ts`](packages/utils/src/hash.ts)). Migrated to `@noble/hashes` ^1.8 (sync, pure-JS, audited, actively maintained). The audit's preferred path was libauth, but libauth's hash is WASM-backed and requires async `instantiateSha256()`, which would break the sync facade that `decodePrivateKeyWif` and every other caller consume. The choice is documented in the new module header. All five existing hash-vector tests pass unchanged.
+- **§3.7 amount type widening** ([`packages/cashscript/src/interfaces.ts`](packages/cashscript/src/interfaces.ts), [`Transaction.ts`](packages/cashscript/src/Transaction.ts), [`utils.ts`](packages/cashscript/src/utils.ts)). New `SatoshiAmount = number | bigint`. `Recipient.amount`, `Output.amount`, and `Transaction.to(to, amount)` accept either. `validateAmount` enforces: number must be a safe integer, bigint must be ≥ 0n and ≤ `MAX_SAFE_SATOSHIS` (uint64 max). Internal amount-vs-amount arithmetic in `setInputsAndOutputs` runs entirely in bigint so large batches cannot silently wrap. Build target bumped es2015 → es2020 for BigInt literals. Eight new tests in `Transaction.test.ts` cover both branches of the type widening end-to-end.
+
+### 10.2 Still open
+
+- **§3.10 ASM-regex optimiser** ([`packages/utils/src/script.ts:303-327`](packages/utils/src/script.ts:303)). The optimiser still builds `new RegExp` from external `cashproof-optimisations.equiv` patterns and runs on ASM strings. Refactoring this to an opcode-list pass with property-based regression tests is its own project; deferred.
+
+Everything else from §1–§9 is now either FIXED, intentionally documented as illustrative, or out of scope per the original audit's §7.
+
+---
+
+*End of 2026-05-28 final remediation pass.*

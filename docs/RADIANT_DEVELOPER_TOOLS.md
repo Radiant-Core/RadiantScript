@@ -199,7 +199,7 @@ cd rxdeb
 
 ### radiantjs
 ```bash
-npm install @radiantblockchain/radiantjs
+npm install @radiant-core/radiantjs
 ```
 
 ### Constants

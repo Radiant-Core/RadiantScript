@@ -325,3 +325,151 @@ function replaceOps(script: Script, optimisations: string[][]): Script {
 
   return asmToScript(asm);
 }
+
+/* ------------------------------------------------------------------ *
+ * Opcode-list optimisation pass (audit §3.10)                        *
+ *                                                                    *
+ * Replaces the legacy `scriptToAsm -> regex -> asmToScript` pipeline *
+ * above. The audit flagged the regex pass as fragile to future       *
+ * grammar additions whose mnemonic is a prefix of another opcode     *
+ * (e.g. a careless `.equiv` rule could mis-rewrite). This pass       *
+ * operates directly on the opcode list: rules are parsed once at     *
+ * module load into structured `(lhs Op[], rhs Op[])` pairs, and      *
+ * matches only at exact opcode equality (never on data pushes).      *
+ * ------------------------------------------------------------------ */
+
+interface OptimisationRule {
+  lhs: Op[];
+  rhs: Op[];
+  source: string;
+}
+
+// Tokens like `OP_NOT`, `OP_1ADD`, ... resolve to opcode numbers via the
+// libauth OpcodesBCH enum (re-exported as `Op` above). Radiant- and
+// introspection-specific tokens (`OP_STATESEPARATOR`, `OP_INPUTINDEX`,
+// ...) are also accepted in case future rules touch them.
+function resolveOpcodeToken(token: string): Op {
+  const fromBch = (Op as unknown as Record<string, number>)[token];
+  if (typeof fromBch === 'number') return fromBch;
+
+  const fromIntrospection = (IntrospectionOp as unknown as Record<string, number>)[token];
+  if (typeof fromIntrospection === 'number') return fromIntrospection;
+
+  const fromRadiant = (RadiantOp as unknown as Record<string, number>)[token];
+  if (typeof fromRadiant === 'number') return fromRadiant;
+
+  throw new Error(`Unknown opcode token in optimisation rule: "${token}"`);
+}
+
+function parseRuleSide(side: string): Op[] {
+  const trimmed = side.trim();
+  if (trimmed === '') return [];
+  return trimmed.split(/\s+/).map(resolveOpcodeToken);
+}
+
+function parseOptimisationRules(equivFile: string): OptimisationRule[] {
+  // Strip both whole-line and inline `#` comments before joining; the legacy
+  // parser only handled whole-line comments, but inline-tolerant is safer.
+  const joined = equivFile
+    .split('\n')
+    .map((line) => line.replace(/#.*$/, '').trim())
+    .filter((line) => line.length > 0)
+    .join(' ');
+
+  const rules: OptimisationRule[] = [];
+  for (const raw of joined.split(';')) {
+    const stmt = raw.trim();
+    if (stmt === '') continue;
+    const parts = stmt.split('<=>');
+    if (parts.length !== 2) continue;
+
+    const lhs = parseRuleSide(parts[0]);
+    const rhs = parseRuleSide(parts[1]);
+
+    // An empty LHS would match every position and loop forever; reject.
+    if (lhs.length === 0) {
+      throw new Error(`Optimisation rule has empty LHS: "${stmt}"`);
+    }
+    // Rules are supposed to shrink (or be size-neutral). A growing rule
+    // would not converge in `optimiseBytecode`'s fixed-point loop.
+    if (rhs.length > lhs.length) {
+      throw new Error(`Optimisation rule would grow script: "${stmt}"`);
+    }
+    rules.push({ lhs, rhs, source: stmt });
+  }
+  return rules;
+}
+
+// Hardcoded rules that live outside `cashproof-optimisations.equiv`
+// because CashProof can't model them (the regex pass kept these inline at
+// the bottom of `replaceOps`; we lift them into the same structured form).
+const HARDCODED_RULES: OptimisationRule[] = [
+  { lhs: [Op.OP_NOT, Op.OP_IF], rhs: [Op.OP_NOTIF], source: 'OP_NOT OP_IF <=> OP_NOTIF' },
+  { lhs: [Op.OP_CHECKMULTISIG, Op.OP_VERIFY], rhs: [Op.OP_CHECKMULTISIGVERIFY], source: 'OP_CHECKMULTISIG OP_VERIFY <=> OP_CHECKMULTISIGVERIFY' },
+  { lhs: [Op.OP_SWAP, Op.OP_AND], rhs: [Op.OP_AND], source: 'OP_SWAP OP_AND <=> OP_AND' },
+  { lhs: [Op.OP_SWAP, Op.OP_OR], rhs: [Op.OP_OR], source: 'OP_SWAP OP_OR <=> OP_OR' },
+  { lhs: [Op.OP_SWAP, Op.OP_XOR], rhs: [Op.OP_XOR], source: 'OP_SWAP OP_XOR <=> OP_XOR' },
+  { lhs: [Op.OP_DUP, Op.OP_AND], rhs: [], source: 'OP_DUP OP_AND <=>' },
+  { lhs: [Op.OP_DUP, Op.OP_OR], rhs: [], source: 'OP_DUP OP_OR <=>' },
+];
+
+// Parsed at module load. If `OptimisationsEquivFile` contains an unknown
+// opcode token, importing this module will throw — that's intentional:
+// the audit asked for unknown tokens to be rejected, and a silently
+// no-op rule would be worse than a load-time error.
+export const OPTIMISATION_RULES: readonly OptimisationRule[] = Object.freeze([
+  ...parseOptimisationRules(OptimisationsEquivFile),
+  ...HARDCODED_RULES,
+]);
+
+// Leftmost, non-overlapping replacement (the same semantics as the
+// regex's `g` flag) of `rule.lhs` with `rule.rhs` in `script`. Matches
+// only at exact opcode equality and skips data pushes (`Uint8Array`).
+// Returns the input reference unchanged if no match was found, so the
+// fixed-point loop can compare by identity.
+function applyOpcodeListRule(script: Script, rule: OptimisationRule): Script {
+  const { lhs, rhs } = rule;
+  const result: Script = [];
+  let i = 0;
+  let changed = false;
+  while (i < script.length) {
+    if (i + lhs.length <= script.length) {
+      let matched = true;
+      for (let k = 0; k < lhs.length; k += 1) {
+        const element = script[i + k];
+        if (typeof element !== 'number' || element !== lhs[k]) {
+          matched = false;
+          break;
+        }
+      }
+      if (matched) {
+        for (const op of rhs) result.push(op);
+        i += lhs.length;
+        changed = true;
+        continue;
+      }
+    }
+    result.push(script[i]);
+    i += 1;
+  }
+  return changed ? result : script;
+}
+
+// New entry point. Walks the rule list (cashproof rules first, hardcoded
+// rules last — matching the legacy regex order) and re-runs to a fixed
+// point. `runs` caps the iteration count as a runaway safety; reaching
+// it would indicate a non-converging rule set (rejected at parse time).
+export function optimiseBytecodeOpcodeList(script: Script, runs: number = 1000): Script {
+  for (let i = 0; i < runs; i += 1) {
+    let iterationChanged = false;
+    for (const rule of OPTIMISATION_RULES) {
+      const next = applyOpcodeListRule(script, rule);
+      if (next !== script) {
+        script = next;
+        iterationChanged = true;
+      }
+    }
+    if (!iterationChanged) break;
+  }
+  return script;
+}

@@ -87,21 +87,25 @@ export class CashScriptParser extends Parser {
 	public static readonly T__56 = 57;
 	public static readonly T__57 = 58;
 	public static readonly T__58 = 59;
-	public static readonly VersionLiteral = 60;
-	public static readonly BooleanLiteral = 61;
-	public static readonly NumberUnit = 62;
-	public static readonly NumberLiteral = 63;
-	public static readonly Bytes = 64;
-	public static readonly Bound = 65;
-	public static readonly StringLiteral = 66;
-	public static readonly DateLiteral = 67;
-	public static readonly HexLiteral = 68;
-	public static readonly TxVar = 69;
-	public static readonly NullaryOp = 70;
-	public static readonly Identifier = 71;
-	public static readonly WHITESPACE = 72;
-	public static readonly COMMENT = 73;
-	public static readonly LINE_COMMENT = 74;
+	public static readonly T__59 = 60;
+	public static readonly T__60 = 61;
+	public static readonly T__61 = 62;
+	public static readonly VersionLiteral = 63;
+	public static readonly BooleanLiteral = 64;
+	public static readonly NumberUnit = 65;
+	public static readonly NumberLiteral = 66;
+	public static readonly Bytes = 67;
+	public static readonly Bound = 68;
+	public static readonly StringLiteral = 69;
+	public static readonly DateLiteral = 70;
+	public static readonly HexLiteral = 71;
+	public static readonly TxVar = 72;
+	public static readonly TxStateField = 73;
+	public static readonly NullaryOp = 74;
+	public static readonly Identifier = 75;
+	public static readonly WHITESPACE = 76;
+	public static readonly COMMENT = 77;
+	public static readonly LINE_COMMENT = 78;
 	public static readonly RULE_sourceFile = 0;
 	public static readonly RULE_pragmaDirective = 1;
 	public static readonly RULE_pragmaName = 2;
@@ -153,11 +157,11 @@ export class CashScriptParser extends Parser {
 		"'return'", "','", "'stateSeparator'", "'('", "')'", "'require'", "'if'", 
 		"'else'", "'pushData'", "'pushInputRef'", "'requireInputRef'", "'disallowPushInputRefSibling'", 
 		"'disallowPushInputRef'", "'pushInputRefSingleton'", "'unset'", "'new'", 
-		"'['", "']'", "'tx.outputs'", "'.'", "'tx.inputs'", "'tx.outputs.zeroValue'", 
+		"'['", "']'", "'tx.outputs'", "'.'", "'tx.inputs'", "'tx.state'", "'tx.outputs.zeroValue'", 
 		"'tx.inputs.zeroValue'", "'.reverse()'", "'.length'", "'.split'", "'!'", 
-		"'-'", "'*'", "'/'", "'%'", "'+'", "'=='", "'!='", "'&'", "'|'", "'&&'", 
-		"'||'", "'constant'", "'int'", "'bool'", "'string'", "'pubkey'", "'sig'", 
-		"'datasig'",
+		"'-'", "'*'", "'/'", "'%'", "'+'", "'>>'", "'<<'", "'=='", "'!='", "'&'", 
+		"'|'", "'&&'", "'||'", "'constant'", "'int'", "'bool'", "'string'", "'pubkey'", 
+		"'sig'", "'datasig'",
 	];
 	private static readonly _SYMBOLIC_NAMES: Array<string | undefined> = [
 		undefined, undefined, undefined, undefined, undefined, undefined, undefined, 
@@ -168,10 +172,10 @@ export class CashScriptParser extends Parser {
 		undefined, undefined, undefined, undefined, undefined, undefined, undefined, 
 		undefined, undefined, undefined, undefined, undefined, undefined, undefined, 
 		undefined, undefined, undefined, undefined, undefined, undefined, undefined, 
-		undefined, undefined, undefined, undefined, "VersionLiteral", "BooleanLiteral", 
-		"NumberUnit", "NumberLiteral", "Bytes", "Bound", "StringLiteral", "DateLiteral", 
-		"HexLiteral", "TxVar", "NullaryOp", "Identifier", "WHITESPACE", "COMMENT", 
-		"LINE_COMMENT",
+		undefined, undefined, undefined, undefined, undefined, undefined, undefined, 
+		"VersionLiteral", "BooleanLiteral", "NumberUnit", "NumberLiteral", "Bytes", 
+		"Bound", "StringLiteral", "DateLiteral", "HexLiteral", "TxVar", "TxStateField", 
+		"NullaryOp", "Identifier", "WHITESPACE", "COMMENT", "LINE_COMMENT",
 	];
 	public static readonly VOCABULARY: Vocabulary = new VocabularyImpl(CashScriptParser._LITERAL_NAMES, CashScriptParser._SYMBOLIC_NAMES, []);
 
@@ -446,7 +450,7 @@ export class CashScriptParser extends Parser {
 			this.state = 107;
 			this._errHandler.sync(this);
 			_la = this._input.LA(1);
-			while ((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << CashScriptParser.T__19) | (1 << CashScriptParser.T__20) | (1 << CashScriptParser.T__22) | (1 << CashScriptParser.T__23) | (1 << CashScriptParser.T__24) | (1 << CashScriptParser.T__25) | (1 << CashScriptParser.T__26) | (1 << CashScriptParser.T__27) | (1 << CashScriptParser.T__28))) !== 0) || ((((_la - 54)) & ~0x1F) === 0 && ((1 << (_la - 54)) & ((1 << (CashScriptParser.T__53 - 54)) | (1 << (CashScriptParser.T__54 - 54)) | (1 << (CashScriptParser.T__55 - 54)) | (1 << (CashScriptParser.T__56 - 54)) | (1 << (CashScriptParser.T__57 - 54)) | (1 << (CashScriptParser.T__58 - 54)) | (1 << (CashScriptParser.Bytes - 54)) | (1 << (CashScriptParser.Identifier - 54)))) !== 0)) {
+			while ((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << CashScriptParser.T__19) | (1 << CashScriptParser.T__20) | (1 << CashScriptParser.T__22) | (1 << CashScriptParser.T__23) | (1 << CashScriptParser.T__24) | (1 << CashScriptParser.T__25) | (1 << CashScriptParser.T__26) | (1 << CashScriptParser.T__27) | (1 << CashScriptParser.T__28))) !== 0) || ((((_la - 57)) & ~0x1F) === 0 && ((1 << (_la - 57)) & ((1 << (CashScriptParser.T__56 - 57)) | (1 << (CashScriptParser.T__57 - 57)) | (1 << (CashScriptParser.T__58 - 57)) | (1 << (CashScriptParser.T__59 - 57)) | (1 << (CashScriptParser.T__60 - 57)) | (1 << (CashScriptParser.T__61 - 57)) | (1 << (CashScriptParser.Bytes - 57)) | (1 << (CashScriptParser.Identifier - 57)))) !== 0)) {
 				{
 				{
 				this.state = 104;
@@ -610,7 +614,7 @@ export class CashScriptParser extends Parser {
 				this.state = 139;
 				this._errHandler.sync(this);
 				_la = this._input.LA(1);
-			} while ((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << CashScriptParser.T__19) | (1 << CashScriptParser.T__20) | (1 << CashScriptParser.T__22) | (1 << CashScriptParser.T__23) | (1 << CashScriptParser.T__24) | (1 << CashScriptParser.T__25) | (1 << CashScriptParser.T__26) | (1 << CashScriptParser.T__27) | (1 << CashScriptParser.T__28))) !== 0) || ((((_la - 54)) & ~0x1F) === 0 && ((1 << (_la - 54)) & ((1 << (CashScriptParser.T__53 - 54)) | (1 << (CashScriptParser.T__54 - 54)) | (1 << (CashScriptParser.T__55 - 54)) | (1 << (CashScriptParser.T__56 - 54)) | (1 << (CashScriptParser.T__57 - 54)) | (1 << (CashScriptParser.T__58 - 54)) | (1 << (CashScriptParser.Bytes - 54)) | (1 << (CashScriptParser.Identifier - 54)))) !== 0));
+			} while ((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << CashScriptParser.T__19) | (1 << CashScriptParser.T__20) | (1 << CashScriptParser.T__22) | (1 << CashScriptParser.T__23) | (1 << CashScriptParser.T__24) | (1 << CashScriptParser.T__25) | (1 << CashScriptParser.T__26) | (1 << CashScriptParser.T__27) | (1 << CashScriptParser.T__28))) !== 0) || ((((_la - 57)) & ~0x1F) === 0 && ((1 << (_la - 57)) & ((1 << (CashScriptParser.T__56 - 57)) | (1 << (CashScriptParser.T__57 - 57)) | (1 << (CashScriptParser.T__58 - 57)) | (1 << (CashScriptParser.T__59 - 57)) | (1 << (CashScriptParser.T__60 - 57)) | (1 << (CashScriptParser.T__61 - 57)) | (1 << (CashScriptParser.Bytes - 57)) | (1 << (CashScriptParser.Identifier - 57)))) !== 0));
 			this.state = 141;
 			this.stateSeparator();
 			}
@@ -673,7 +677,7 @@ export class CashScriptParser extends Parser {
 			this.state = 152;
 			this._errHandler.sync(this);
 			_la = this._input.LA(1);
-			while ((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << CashScriptParser.T__19) | (1 << CashScriptParser.T__20) | (1 << CashScriptParser.T__22) | (1 << CashScriptParser.T__23) | (1 << CashScriptParser.T__24) | (1 << CashScriptParser.T__25) | (1 << CashScriptParser.T__26) | (1 << CashScriptParser.T__27) | (1 << CashScriptParser.T__28))) !== 0) || ((((_la - 54)) & ~0x1F) === 0 && ((1 << (_la - 54)) & ((1 << (CashScriptParser.T__53 - 54)) | (1 << (CashScriptParser.T__54 - 54)) | (1 << (CashScriptParser.T__55 - 54)) | (1 << (CashScriptParser.T__56 - 54)) | (1 << (CashScriptParser.T__57 - 54)) | (1 << (CashScriptParser.T__58 - 54)) | (1 << (CashScriptParser.Bytes - 54)) | (1 << (CashScriptParser.Identifier - 54)))) !== 0)) {
+			while ((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << CashScriptParser.T__19) | (1 << CashScriptParser.T__20) | (1 << CashScriptParser.T__22) | (1 << CashScriptParser.T__23) | (1 << CashScriptParser.T__24) | (1 << CashScriptParser.T__25) | (1 << CashScriptParser.T__26) | (1 << CashScriptParser.T__27) | (1 << CashScriptParser.T__28))) !== 0) || ((((_la - 57)) & ~0x1F) === 0 && ((1 << (_la - 57)) & ((1 << (CashScriptParser.T__56 - 57)) | (1 << (CashScriptParser.T__57 - 57)) | (1 << (CashScriptParser.T__58 - 57)) | (1 << (CashScriptParser.T__59 - 57)) | (1 << (CashScriptParser.T__60 - 57)) | (1 << (CashScriptParser.T__61 - 57)) | (1 << (CashScriptParser.Bytes - 57)) | (1 << (CashScriptParser.Identifier - 57)))) !== 0)) {
 				{
 				{
 				this.state = 149;
@@ -716,7 +720,7 @@ export class CashScriptParser extends Parser {
 			this.state = 169;
 			this._errHandler.sync(this);
 			_la = this._input.LA(1);
-			if (((((_la - 54)) & ~0x1F) === 0 && ((1 << (_la - 54)) & ((1 << (CashScriptParser.T__53 - 54)) | (1 << (CashScriptParser.T__54 - 54)) | (1 << (CashScriptParser.T__55 - 54)) | (1 << (CashScriptParser.T__56 - 54)) | (1 << (CashScriptParser.T__57 - 54)) | (1 << (CashScriptParser.T__58 - 54)) | (1 << (CashScriptParser.Bytes - 54)))) !== 0)) {
+			if (((((_la - 57)) & ~0x1F) === 0 && ((1 << (_la - 57)) & ((1 << (CashScriptParser.T__56 - 57)) | (1 << (CashScriptParser.T__57 - 57)) | (1 << (CashScriptParser.T__58 - 57)) | (1 << (CashScriptParser.T__59 - 57)) | (1 << (CashScriptParser.T__60 - 57)) | (1 << (CashScriptParser.T__61 - 57)) | (1 << (CashScriptParser.Bytes - 57)))) !== 0)) {
 				{
 				this.state = 158;
 				this.parameter();
@@ -782,7 +786,7 @@ export class CashScriptParser extends Parser {
 			this.state = 175;
 			this._errHandler.sync(this);
 			_la = this._input.LA(1);
-			if (_la === CashScriptParser.T__52) {
+			if (_la === CashScriptParser.T__55) {
 				{
 				this.state = 174;
 				this.modifier();
@@ -824,7 +828,7 @@ export class CashScriptParser extends Parser {
 				this.state = 183;
 				this._errHandler.sync(this);
 				_la = this._input.LA(1);
-				while ((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << CashScriptParser.T__19) | (1 << CashScriptParser.T__20) | (1 << CashScriptParser.T__22) | (1 << CashScriptParser.T__23) | (1 << CashScriptParser.T__24) | (1 << CashScriptParser.T__25) | (1 << CashScriptParser.T__26) | (1 << CashScriptParser.T__27) | (1 << CashScriptParser.T__28))) !== 0) || ((((_la - 54)) & ~0x1F) === 0 && ((1 << (_la - 54)) & ((1 << (CashScriptParser.T__53 - 54)) | (1 << (CashScriptParser.T__54 - 54)) | (1 << (CashScriptParser.T__55 - 54)) | (1 << (CashScriptParser.T__56 - 54)) | (1 << (CashScriptParser.T__57 - 54)) | (1 << (CashScriptParser.T__58 - 54)) | (1 << (CashScriptParser.Bytes - 54)) | (1 << (CashScriptParser.Identifier - 54)))) !== 0)) {
+				while ((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << CashScriptParser.T__19) | (1 << CashScriptParser.T__20) | (1 << CashScriptParser.T__22) | (1 << CashScriptParser.T__23) | (1 << CashScriptParser.T__24) | (1 << CashScriptParser.T__25) | (1 << CashScriptParser.T__26) | (1 << CashScriptParser.T__27) | (1 << CashScriptParser.T__28))) !== 0) || ((((_la - 57)) & ~0x1F) === 0 && ((1 << (_la - 57)) & ((1 << (CashScriptParser.T__56 - 57)) | (1 << (CashScriptParser.T__57 - 57)) | (1 << (CashScriptParser.T__58 - 57)) | (1 << (CashScriptParser.T__59 - 57)) | (1 << (CashScriptParser.T__60 - 57)) | (1 << (CashScriptParser.T__61 - 57)) | (1 << (CashScriptParser.Bytes - 57)) | (1 << (CashScriptParser.Identifier - 57)))) !== 0)) {
 					{
 					{
 					this.state = 180;
@@ -848,12 +852,12 @@ export class CashScriptParser extends Parser {
 			case CashScriptParser.T__26:
 			case CashScriptParser.T__27:
 			case CashScriptParser.T__28:
-			case CashScriptParser.T__53:
-			case CashScriptParser.T__54:
-			case CashScriptParser.T__55:
 			case CashScriptParser.T__56:
 			case CashScriptParser.T__57:
 			case CashScriptParser.T__58:
+			case CashScriptParser.T__59:
+			case CashScriptParser.T__60:
+			case CashScriptParser.T__61:
 			case CashScriptParser.Bytes:
 			case CashScriptParser.Identifier:
 				this.enterOuterAlt(_localctx, 2);
@@ -988,7 +992,7 @@ export class CashScriptParser extends Parser {
 			this.state = 203;
 			this._errHandler.sync(this);
 			_la = this._input.LA(1);
-			if (_la === CashScriptParser.T__52) {
+			if (_la === CashScriptParser.T__55) {
 				{
 				this.state = 202;
 				this.modifier();
@@ -1402,7 +1406,7 @@ export class CashScriptParser extends Parser {
 			this.state = 282;
 			this._errHandler.sync(this);
 			_la = this._input.LA(1);
-			if (((((_la - 18)) & ~0x1F) === 0 && ((1 << (_la - 18)) & ((1 << (CashScriptParser.T__17 - 18)) | (1 << (CashScriptParser.T__23 - 18)) | (1 << (CashScriptParser.T__24 - 18)) | (1 << (CashScriptParser.T__25 - 18)) | (1 << (CashScriptParser.T__26 - 18)) | (1 << (CashScriptParser.T__27 - 18)) | (1 << (CashScriptParser.T__29 - 18)) | (1 << (CashScriptParser.T__30 - 18)) | (1 << (CashScriptParser.T__32 - 18)) | (1 << (CashScriptParser.T__34 - 18)) | (1 << (CashScriptParser.T__35 - 18)) | (1 << (CashScriptParser.T__36 - 18)) | (1 << (CashScriptParser.T__40 - 18)) | (1 << (CashScriptParser.T__41 - 18)))) !== 0) || ((((_la - 54)) & ~0x1F) === 0 && ((1 << (_la - 54)) & ((1 << (CashScriptParser.T__53 - 54)) | (1 << (CashScriptParser.T__54 - 54)) | (1 << (CashScriptParser.T__55 - 54)) | (1 << (CashScriptParser.T__56 - 54)) | (1 << (CashScriptParser.T__57 - 54)) | (1 << (CashScriptParser.T__58 - 54)) | (1 << (CashScriptParser.BooleanLiteral - 54)) | (1 << (CashScriptParser.NumberLiteral - 54)) | (1 << (CashScriptParser.Bytes - 54)) | (1 << (CashScriptParser.StringLiteral - 54)) | (1 << (CashScriptParser.DateLiteral - 54)) | (1 << (CashScriptParser.HexLiteral - 54)) | (1 << (CashScriptParser.NullaryOp - 54)) | (1 << (CashScriptParser.Identifier - 54)))) !== 0)) {
+			if (((((_la - 18)) & ~0x1F) === 0 && ((1 << (_la - 18)) & ((1 << (CashScriptParser.T__17 - 18)) | (1 << (CashScriptParser.T__23 - 18)) | (1 << (CashScriptParser.T__24 - 18)) | (1 << (CashScriptParser.T__25 - 18)) | (1 << (CashScriptParser.T__26 - 18)) | (1 << (CashScriptParser.T__27 - 18)) | (1 << (CashScriptParser.T__29 - 18)) | (1 << (CashScriptParser.T__30 - 18)) | (1 << (CashScriptParser.T__32 - 18)) | (1 << (CashScriptParser.T__34 - 18)) | (1 << (CashScriptParser.T__35 - 18)) | (1 << (CashScriptParser.T__36 - 18)) | (1 << (CashScriptParser.T__37 - 18)) | (1 << (CashScriptParser.T__41 - 18)) | (1 << (CashScriptParser.T__42 - 18)))) !== 0) || ((((_la - 57)) & ~0x1F) === 0 && ((1 << (_la - 57)) & ((1 << (CashScriptParser.T__56 - 57)) | (1 << (CashScriptParser.T__57 - 57)) | (1 << (CashScriptParser.T__58 - 57)) | (1 << (CashScriptParser.T__59 - 57)) | (1 << (CashScriptParser.T__60 - 57)) | (1 << (CashScriptParser.T__61 - 57)) | (1 << (CashScriptParser.BooleanLiteral - 57)) | (1 << (CashScriptParser.NumberLiteral - 57)) | (1 << (CashScriptParser.Bytes - 57)) | (1 << (CashScriptParser.StringLiteral - 57)) | (1 << (CashScriptParser.DateLiteral - 57)) | (1 << (CashScriptParser.HexLiteral - 57)) | (1 << (CashScriptParser.NullaryOp - 57)) | (1 << (CashScriptParser.Identifier - 57)))) !== 0)) {
 				{
 				this.state = 271;
 				this.expression(0);
@@ -1475,7 +1479,7 @@ export class CashScriptParser extends Parser {
 			let _alt: number;
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 358;
+			this.state = 365;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 30, this._ctx) ) {
 			case 1:
@@ -1597,17 +1601,21 @@ export class CashScriptParser extends Parser {
 
 			case 7:
 				{
-				_localctx = new IntrospectionFunctionCallContext(_localctx);
+				_localctx = new UnaryIntrospectionOpContext(_localctx);
 				this._ctx = _localctx;
 				_prevctx = _localctx;
 				this.state = 321;
-				(_localctx as IntrospectionFunctionCallContext)._scope = this.match(CashScriptParser.T__32);
+				(_localctx as UnaryIntrospectionOpContext)._scope = this.match(CashScriptParser.T__35);
 				this.state = 322;
-				this.match(CashScriptParser.T__33);
+				this.match(CashScriptParser.T__30);
 				this.state = 323;
-				this.match(CashScriptParser.Identifier);
+				this.expression(0);
 				this.state = 324;
-				this.expressionList();
+				this.match(CashScriptParser.T__31);
+				this.state = 325;
+				this.match(CashScriptParser.T__33);
+				this.state = 326;
+				(_localctx as UnaryIntrospectionOpContext)._op = this.match(CashScriptParser.TxStateField);
 				}
 				break;
 
@@ -1616,13 +1624,13 @@ export class CashScriptParser extends Parser {
 				_localctx = new IntrospectionFunctionCallContext(_localctx);
 				this._ctx = _localctx;
 				_prevctx = _localctx;
-				this.state = 325;
-				(_localctx as IntrospectionFunctionCallContext)._scope = this.match(CashScriptParser.T__34);
-				this.state = 326;
-				this.match(CashScriptParser.T__33);
-				this.state = 327;
-				this.match(CashScriptParser.Identifier);
 				this.state = 328;
+				(_localctx as IntrospectionFunctionCallContext)._scope = this.match(CashScriptParser.T__32);
+				this.state = 329;
+				this.match(CashScriptParser.T__33);
+				this.state = 330;
+				this.match(CashScriptParser.Identifier);
+				this.state = 331;
 				this.expressionList();
 				}
 				break;
@@ -1632,13 +1640,13 @@ export class CashScriptParser extends Parser {
 				_localctx = new IntrospectionFunctionCallContext(_localctx);
 				this._ctx = _localctx;
 				_prevctx = _localctx;
-				this.state = 329;
-				(_localctx as IntrospectionFunctionCallContext)._scope = this.match(CashScriptParser.T__35);
-				this.state = 330;
-				this.match(CashScriptParser.T__33);
-				this.state = 331;
-				this.match(CashScriptParser.Identifier);
 				this.state = 332;
+				(_localctx as IntrospectionFunctionCallContext)._scope = this.match(CashScriptParser.T__34);
+				this.state = 333;
+				this.match(CashScriptParser.T__33);
+				this.state = 334;
+				this.match(CashScriptParser.Identifier);
+				this.state = 335;
 				this.expressionList();
 				}
 				break;
@@ -1648,36 +1656,52 @@ export class CashScriptParser extends Parser {
 				_localctx = new IntrospectionFunctionCallContext(_localctx);
 				this._ctx = _localctx;
 				_prevctx = _localctx;
-				this.state = 333;
-				(_localctx as IntrospectionFunctionCallContext)._scope = this.match(CashScriptParser.T__36);
-				this.state = 334;
-				this.match(CashScriptParser.T__33);
-				this.state = 335;
-				this.match(CashScriptParser.Identifier);
 				this.state = 336;
+				(_localctx as IntrospectionFunctionCallContext)._scope = this.match(CashScriptParser.T__36);
+				this.state = 337;
+				this.match(CashScriptParser.T__33);
+				this.state = 338;
+				this.match(CashScriptParser.Identifier);
+				this.state = 339;
 				this.expressionList();
 				}
 				break;
 
 			case 11:
 				{
-				_localctx = new PushRefExpressionContext(_localctx);
+				_localctx = new IntrospectionFunctionCallContext(_localctx);
 				this._ctx = _localctx;
 				_prevctx = _localctx;
-				this.state = 337;
-				this.pushRef();
+				this.state = 340;
+				(_localctx as IntrospectionFunctionCallContext)._scope = this.match(CashScriptParser.T__37);
+				this.state = 341;
+				this.match(CashScriptParser.T__33);
+				this.state = 342;
+				this.match(CashScriptParser.Identifier);
+				this.state = 343;
+				this.expressionList();
 				}
 				break;
 
 			case 12:
 				{
+				_localctx = new PushRefExpressionContext(_localctx);
+				this._ctx = _localctx;
+				_prevctx = _localctx;
+				this.state = 344;
+				this.pushRef();
+				}
+				break;
+
+			case 13:
+				{
 				_localctx = new UnaryOpContext(_localctx);
 				this._ctx = _localctx;
 				_prevctx = _localctx;
-				this.state = 338;
+				this.state = 345;
 				(_localctx as UnaryOpContext)._op = this._input.LT(1);
 				_la = this._input.LA(1);
-				if (!(_la === CashScriptParser.T__40 || _la === CashScriptParser.T__41)) {
+				if (!(_la === CashScriptParser.T__41 || _la === CashScriptParser.T__42)) {
 					(_localctx as UnaryOpContext)._op = this._errHandler.recoverInline(this);
 				} else {
 					if (this._input.LA(1) === Token.EOF) {
@@ -1687,49 +1711,49 @@ export class CashScriptParser extends Parser {
 					this._errHandler.reportMatch(this);
 					this.consume();
 				}
-				this.state = 339;
-				this.expression(14);
+				this.state = 346;
+				this.expression(15);
 				}
 				break;
 
-			case 13:
+			case 14:
 				{
 				_localctx = new ArrayContext(_localctx);
 				this._ctx = _localctx;
 				_prevctx = _localctx;
-				this.state = 340;
+				this.state = 347;
 				this.match(CashScriptParser.T__30);
-				this.state = 352;
+				this.state = 359;
 				this._errHandler.sync(this);
 				_la = this._input.LA(1);
-				if (((((_la - 18)) & ~0x1F) === 0 && ((1 << (_la - 18)) & ((1 << (CashScriptParser.T__17 - 18)) | (1 << (CashScriptParser.T__23 - 18)) | (1 << (CashScriptParser.T__24 - 18)) | (1 << (CashScriptParser.T__25 - 18)) | (1 << (CashScriptParser.T__26 - 18)) | (1 << (CashScriptParser.T__27 - 18)) | (1 << (CashScriptParser.T__29 - 18)) | (1 << (CashScriptParser.T__30 - 18)) | (1 << (CashScriptParser.T__32 - 18)) | (1 << (CashScriptParser.T__34 - 18)) | (1 << (CashScriptParser.T__35 - 18)) | (1 << (CashScriptParser.T__36 - 18)) | (1 << (CashScriptParser.T__40 - 18)) | (1 << (CashScriptParser.T__41 - 18)))) !== 0) || ((((_la - 54)) & ~0x1F) === 0 && ((1 << (_la - 54)) & ((1 << (CashScriptParser.T__53 - 54)) | (1 << (CashScriptParser.T__54 - 54)) | (1 << (CashScriptParser.T__55 - 54)) | (1 << (CashScriptParser.T__56 - 54)) | (1 << (CashScriptParser.T__57 - 54)) | (1 << (CashScriptParser.T__58 - 54)) | (1 << (CashScriptParser.BooleanLiteral - 54)) | (1 << (CashScriptParser.NumberLiteral - 54)) | (1 << (CashScriptParser.Bytes - 54)) | (1 << (CashScriptParser.StringLiteral - 54)) | (1 << (CashScriptParser.DateLiteral - 54)) | (1 << (CashScriptParser.HexLiteral - 54)) | (1 << (CashScriptParser.NullaryOp - 54)) | (1 << (CashScriptParser.Identifier - 54)))) !== 0)) {
+				if (((((_la - 18)) & ~0x1F) === 0 && ((1 << (_la - 18)) & ((1 << (CashScriptParser.T__17 - 18)) | (1 << (CashScriptParser.T__23 - 18)) | (1 << (CashScriptParser.T__24 - 18)) | (1 << (CashScriptParser.T__25 - 18)) | (1 << (CashScriptParser.T__26 - 18)) | (1 << (CashScriptParser.T__27 - 18)) | (1 << (CashScriptParser.T__29 - 18)) | (1 << (CashScriptParser.T__30 - 18)) | (1 << (CashScriptParser.T__32 - 18)) | (1 << (CashScriptParser.T__34 - 18)) | (1 << (CashScriptParser.T__35 - 18)) | (1 << (CashScriptParser.T__36 - 18)) | (1 << (CashScriptParser.T__37 - 18)) | (1 << (CashScriptParser.T__41 - 18)) | (1 << (CashScriptParser.T__42 - 18)))) !== 0) || ((((_la - 57)) & ~0x1F) === 0 && ((1 << (_la - 57)) & ((1 << (CashScriptParser.T__56 - 57)) | (1 << (CashScriptParser.T__57 - 57)) | (1 << (CashScriptParser.T__58 - 57)) | (1 << (CashScriptParser.T__59 - 57)) | (1 << (CashScriptParser.T__60 - 57)) | (1 << (CashScriptParser.T__61 - 57)) | (1 << (CashScriptParser.BooleanLiteral - 57)) | (1 << (CashScriptParser.NumberLiteral - 57)) | (1 << (CashScriptParser.Bytes - 57)) | (1 << (CashScriptParser.StringLiteral - 57)) | (1 << (CashScriptParser.DateLiteral - 57)) | (1 << (CashScriptParser.HexLiteral - 57)) | (1 << (CashScriptParser.NullaryOp - 57)) | (1 << (CashScriptParser.Identifier - 57)))) !== 0)) {
 					{
-					this.state = 341;
+					this.state = 348;
 					this.expression(0);
-					this.state = 346;
+					this.state = 353;
 					this._errHandler.sync(this);
 					_alt = this.interpreter.adaptivePredict(this._input, 27, this._ctx);
 					while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER) {
 						if (_alt === 1) {
 							{
 							{
-							this.state = 342;
+							this.state = 349;
 							this.match(CashScriptParser.T__15);
-							this.state = 343;
+							this.state = 350;
 							this.expression(0);
 							}
 							}
 						}
-						this.state = 348;
+						this.state = 355;
 						this._errHandler.sync(this);
 						_alt = this.interpreter.adaptivePredict(this._input, 27, this._ctx);
 					}
-					this.state = 350;
+					this.state = 357;
 					this._errHandler.sync(this);
 					_la = this._input.LA(1);
 					if (_la === CashScriptParser.T__15) {
 						{
-						this.state = 349;
+						this.state = 356;
 						this.match(CashScriptParser.T__15);
 						}
 					}
@@ -1737,43 +1761,43 @@ export class CashScriptParser extends Parser {
 					}
 				}
 
-				this.state = 354;
+				this.state = 361;
 				this.match(CashScriptParser.T__31);
-				}
-				break;
-
-			case 14:
-				{
-				_localctx = new NullaryOpContext(_localctx);
-				this._ctx = _localctx;
-				_prevctx = _localctx;
-				this.state = 355;
-				this.match(CashScriptParser.NullaryOp);
 				}
 				break;
 
 			case 15:
 				{
-				_localctx = new IdentifierContext(_localctx);
+				_localctx = new NullaryOpContext(_localctx);
 				this._ctx = _localctx;
 				_prevctx = _localctx;
-				this.state = 356;
-				this.match(CashScriptParser.Identifier);
+				this.state = 362;
+				this.match(CashScriptParser.NullaryOp);
 				}
 				break;
 
 			case 16:
 				{
+				_localctx = new IdentifierContext(_localctx);
+				this._ctx = _localctx;
+				_prevctx = _localctx;
+				this.state = 363;
+				this.match(CashScriptParser.Identifier);
+				}
+				break;
+
+			case 17:
+				{
 				_localctx = new LiteralExpressionContext(_localctx);
 				this._ctx = _localctx;
 				_prevctx = _localctx;
-				this.state = 357;
+				this.state = 364;
 				this.literal();
 				}
 				break;
 			}
 			this._ctx._stop = this._input.tryLT(-1);
-			this.state = 401;
+			this.state = 411;
 			this._errHandler.sync(this);
 			_alt = this.interpreter.adaptivePredict(this._input, 32, this._ctx);
 			while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER) {
@@ -1783,7 +1807,7 @@ export class CashScriptParser extends Parser {
 					}
 					_prevctx = _localctx;
 					{
-					this.state = 399;
+					this.state = 409;
 					this._errHandler.sync(this);
 					switch ( this.interpreter.adaptivePredict(this._input, 31, this._ctx) ) {
 					case 1:
@@ -1791,14 +1815,14 @@ export class CashScriptParser extends Parser {
 						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
 						(_localctx as BinaryOpContext)._left = _prevctx;
 						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 360;
-						if (!(this.precpred(this._ctx, 13))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 13)");
+						this.state = 367;
+						if (!(this.precpred(this._ctx, 14))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 14)");
 						}
-						this.state = 361;
+						this.state = 368;
 						(_localctx as BinaryOpContext)._op = this._input.LT(1);
 						_la = this._input.LA(1);
-						if (!(((((_la - 43)) & ~0x1F) === 0 && ((1 << (_la - 43)) & ((1 << (CashScriptParser.T__42 - 43)) | (1 << (CashScriptParser.T__43 - 43)) | (1 << (CashScriptParser.T__44 - 43)))) !== 0))) {
+						if (!(((((_la - 44)) & ~0x1F) === 0 && ((1 << (_la - 44)) & ((1 << (CashScriptParser.T__43 - 44)) | (1 << (CashScriptParser.T__44 - 44)) | (1 << (CashScriptParser.T__45 - 44)))) !== 0))) {
 							(_localctx as BinaryOpContext)._op = this._errHandler.recoverInline(this);
 						} else {
 							if (this._input.LA(1) === Token.EOF) {
@@ -1808,8 +1832,8 @@ export class CashScriptParser extends Parser {
 							this._errHandler.reportMatch(this);
 							this.consume();
 						}
-						this.state = 362;
-						(_localctx as BinaryOpContext)._right = this.expression(14);
+						this.state = 369;
+						(_localctx as BinaryOpContext)._right = this.expression(15);
 						}
 						break;
 
@@ -1818,14 +1842,14 @@ export class CashScriptParser extends Parser {
 						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
 						(_localctx as BinaryOpContext)._left = _prevctx;
 						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 363;
-						if (!(this.precpred(this._ctx, 12))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 12)");
+						this.state = 370;
+						if (!(this.precpred(this._ctx, 13))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 13)");
 						}
-						this.state = 364;
+						this.state = 371;
 						(_localctx as BinaryOpContext)._op = this._input.LT(1);
 						_la = this._input.LA(1);
-						if (!(_la === CashScriptParser.T__41 || _la === CashScriptParser.T__45)) {
+						if (!(_la === CashScriptParser.T__42 || _la === CashScriptParser.T__46)) {
 							(_localctx as BinaryOpContext)._op = this._errHandler.recoverInline(this);
 						} else {
 							if (this._input.LA(1) === Token.EOF) {
@@ -1835,8 +1859,8 @@ export class CashScriptParser extends Parser {
 							this._errHandler.reportMatch(this);
 							this.consume();
 						}
-						this.state = 365;
-						(_localctx as BinaryOpContext)._right = this.expression(13);
+						this.state = 372;
+						(_localctx as BinaryOpContext)._right = this.expression(14);
 						}
 						break;
 
@@ -1845,11 +1869,38 @@ export class CashScriptParser extends Parser {
 						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
 						(_localctx as BinaryOpContext)._left = _prevctx;
 						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 366;
+						this.state = 373;
+						if (!(this.precpred(this._ctx, 12))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 12)");
+						}
+						this.state = 374;
+						(_localctx as BinaryOpContext)._op = this._input.LT(1);
+						_la = this._input.LA(1);
+						if (!(_la === CashScriptParser.T__47 || _la === CashScriptParser.T__48)) {
+							(_localctx as BinaryOpContext)._op = this._errHandler.recoverInline(this);
+						} else {
+							if (this._input.LA(1) === Token.EOF) {
+								this.matchedEOF = true;
+							}
+
+							this._errHandler.reportMatch(this);
+							this.consume();
+						}
+						this.state = 375;
+						(_localctx as BinaryOpContext)._right = this.expression(13);
+						}
+						break;
+
+					case 4:
+						{
+						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
+						(_localctx as BinaryOpContext)._left = _prevctx;
+						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
+						this.state = 376;
 						if (!(this.precpred(this._ctx, 11))) {
 							throw this.createFailedPredicateException("this.precpred(this._ctx, 11)");
 						}
-						this.state = 367;
+						this.state = 377;
 						(_localctx as BinaryOpContext)._op = this._input.LT(1);
 						_la = this._input.LA(1);
 						if (!((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << CashScriptParser.T__5) | (1 << CashScriptParser.T__6) | (1 << CashScriptParser.T__7) | (1 << CashScriptParser.T__8))) !== 0))) {
@@ -1862,24 +1913,24 @@ export class CashScriptParser extends Parser {
 							this._errHandler.reportMatch(this);
 							this.consume();
 						}
-						this.state = 368;
+						this.state = 378;
 						(_localctx as BinaryOpContext)._right = this.expression(12);
 						}
 						break;
 
-					case 4:
+					case 5:
 						{
 						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
 						(_localctx as BinaryOpContext)._left = _prevctx;
 						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 369;
+						this.state = 379;
 						if (!(this.precpred(this._ctx, 10))) {
 							throw this.createFailedPredicateException("this.precpred(this._ctx, 10)");
 						}
-						this.state = 370;
+						this.state = 380;
 						(_localctx as BinaryOpContext)._op = this._input.LT(1);
 						_la = this._input.LA(1);
-						if (!(_la === CashScriptParser.T__46 || _la === CashScriptParser.T__47)) {
+						if (!(_la === CashScriptParser.T__49 || _la === CashScriptParser.T__50)) {
 							(_localctx as BinaryOpContext)._op = this._errHandler.recoverInline(this);
 						} else {
 							if (this._input.LA(1) === Token.EOF) {
@@ -1889,24 +1940,8 @@ export class CashScriptParser extends Parser {
 							this._errHandler.reportMatch(this);
 							this.consume();
 						}
-						this.state = 371;
+						this.state = 381;
 						(_localctx as BinaryOpContext)._right = this.expression(11);
-						}
-						break;
-
-					case 5:
-						{
-						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
-						(_localctx as BinaryOpContext)._left = _prevctx;
-						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 372;
-						if (!(this.precpred(this._ctx, 9))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 9)");
-						}
-						this.state = 373;
-						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__48);
-						this.state = 374;
-						(_localctx as BinaryOpContext)._right = this.expression(10);
 						}
 						break;
 
@@ -1915,14 +1950,14 @@ export class CashScriptParser extends Parser {
 						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
 						(_localctx as BinaryOpContext)._left = _prevctx;
 						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 375;
-						if (!(this.precpred(this._ctx, 8))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 8)");
+						this.state = 382;
+						if (!(this.precpred(this._ctx, 9))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 9)");
 						}
-						this.state = 376;
-						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__3);
-						this.state = 377;
-						(_localctx as BinaryOpContext)._right = this.expression(9);
+						this.state = 383;
+						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__51);
+						this.state = 384;
+						(_localctx as BinaryOpContext)._right = this.expression(10);
 						}
 						break;
 
@@ -1931,14 +1966,14 @@ export class CashScriptParser extends Parser {
 						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
 						(_localctx as BinaryOpContext)._left = _prevctx;
 						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 378;
-						if (!(this.precpred(this._ctx, 7))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 7)");
+						this.state = 385;
+						if (!(this.precpred(this._ctx, 8))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 8)");
 						}
-						this.state = 379;
-						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__49);
-						this.state = 380;
-						(_localctx as BinaryOpContext)._right = this.expression(8);
+						this.state = 386;
+						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__3);
+						this.state = 387;
+						(_localctx as BinaryOpContext)._right = this.expression(9);
 						}
 						break;
 
@@ -1947,14 +1982,14 @@ export class CashScriptParser extends Parser {
 						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
 						(_localctx as BinaryOpContext)._left = _prevctx;
 						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 381;
-						if (!(this.precpred(this._ctx, 6))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 6)");
+						this.state = 388;
+						if (!(this.precpred(this._ctx, 7))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 7)");
 						}
-						this.state = 382;
-						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__50);
-						this.state = 383;
-						(_localctx as BinaryOpContext)._right = this.expression(7);
+						this.state = 389;
+						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__52);
+						this.state = 390;
+						(_localctx as BinaryOpContext)._right = this.expression(8);
 						}
 						break;
 
@@ -1963,46 +1998,62 @@ export class CashScriptParser extends Parser {
 						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
 						(_localctx as BinaryOpContext)._left = _prevctx;
 						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 384;
-						if (!(this.precpred(this._ctx, 5))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 5)");
+						this.state = 391;
+						if (!(this.precpred(this._ctx, 6))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 6)");
 						}
-						this.state = 385;
-						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__51);
-						this.state = 386;
-						(_localctx as BinaryOpContext)._right = this.expression(6);
+						this.state = 392;
+						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__53);
+						this.state = 393;
+						(_localctx as BinaryOpContext)._right = this.expression(7);
 						}
 						break;
 
 					case 10:
 						{
-						_localctx = new TupleIndexOpContext(new ExpressionContext(_parentctx, _parentState));
+						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
+						(_localctx as BinaryOpContext)._left = _prevctx;
 						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 387;
-						if (!(this.precpred(this._ctx, 24))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 24)");
+						this.state = 394;
+						if (!(this.precpred(this._ctx, 5))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 5)");
 						}
-						this.state = 388;
-						this.match(CashScriptParser.T__30);
-						this.state = 389;
-						(_localctx as TupleIndexOpContext)._index = this.match(CashScriptParser.NumberLiteral);
-						this.state = 390;
-						this.match(CashScriptParser.T__31);
+						this.state = 395;
+						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__54);
+						this.state = 396;
+						(_localctx as BinaryOpContext)._right = this.expression(6);
 						}
 						break;
 
 					case 11:
 						{
+						_localctx = new TupleIndexOpContext(new ExpressionContext(_parentctx, _parentState));
+						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
+						this.state = 397;
+						if (!(this.precpred(this._ctx, 26))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 26)");
+						}
+						this.state = 398;
+						this.match(CashScriptParser.T__30);
+						this.state = 399;
+						(_localctx as TupleIndexOpContext)._index = this.match(CashScriptParser.NumberLiteral);
+						this.state = 400;
+						this.match(CashScriptParser.T__31);
+						}
+						break;
+
+					case 12:
+						{
 						_localctx = new UnaryOpContext(new ExpressionContext(_parentctx, _parentState));
 						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 391;
-						if (!(this.precpred(this._ctx, 16))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 16)");
+						this.state = 401;
+						if (!(this.precpred(this._ctx, 17))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 17)");
 						}
-						this.state = 392;
+						this.state = 402;
 						(_localctx as UnaryOpContext)._op = this._input.LT(1);
 						_la = this._input.LA(1);
-						if (!(_la === CashScriptParser.T__37 || _la === CashScriptParser.T__38)) {
+						if (!(_la === CashScriptParser.T__38 || _la === CashScriptParser.T__39)) {
 							(_localctx as UnaryOpContext)._op = this._errHandler.recoverInline(this);
 						} else {
 							if (this._input.LA(1) === Token.EOF) {
@@ -2015,29 +2066,29 @@ export class CashScriptParser extends Parser {
 						}
 						break;
 
-					case 12:
+					case 13:
 						{
 						_localctx = new BinaryOpContext(new ExpressionContext(_parentctx, _parentState));
 						(_localctx as BinaryOpContext)._left = _prevctx;
 						this.pushNewRecursionContext(_localctx, _startState, CashScriptParser.RULE_expression);
-						this.state = 393;
-						if (!(this.precpred(this._ctx, 15))) {
-							throw this.createFailedPredicateException("this.precpred(this._ctx, 15)");
+						this.state = 403;
+						if (!(this.precpred(this._ctx, 16))) {
+							throw this.createFailedPredicateException("this.precpred(this._ctx, 16)");
 						}
-						this.state = 394;
-						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__39);
-						this.state = 395;
+						this.state = 404;
+						(_localctx as BinaryOpContext)._op = this.match(CashScriptParser.T__40);
+						this.state = 405;
 						this.match(CashScriptParser.T__17);
-						this.state = 396;
+						this.state = 406;
 						(_localctx as BinaryOpContext)._right = this.expression(0);
-						this.state = 397;
+						this.state = 407;
 						this.match(CashScriptParser.T__18);
 						}
 						break;
 					}
 					}
 				}
-				this.state = 403;
+				this.state = 413;
 				this._errHandler.sync(this);
 				_alt = this.interpreter.adaptivePredict(this._input, 32, this._ctx);
 			}
@@ -2064,8 +2115,8 @@ export class CashScriptParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 404;
-			this.match(CashScriptParser.T__52);
+			this.state = 414;
+			this.match(CashScriptParser.T__55);
 			}
 		}
 		catch (re) {
@@ -2087,41 +2138,41 @@ export class CashScriptParser extends Parser {
 		let _localctx: LiteralContext = new LiteralContext(this._ctx, this.state);
 		this.enterRule(_localctx, 60, CashScriptParser.RULE_literal);
 		try {
-			this.state = 411;
+			this.state = 421;
 			this._errHandler.sync(this);
 			switch (this._input.LA(1)) {
 			case CashScriptParser.BooleanLiteral:
 				this.enterOuterAlt(_localctx, 1);
 				{
-				this.state = 406;
+				this.state = 416;
 				this.match(CashScriptParser.BooleanLiteral);
 				}
 				break;
 			case CashScriptParser.NumberLiteral:
 				this.enterOuterAlt(_localctx, 2);
 				{
-				this.state = 407;
+				this.state = 417;
 				this.numberLiteral();
 				}
 				break;
 			case CashScriptParser.StringLiteral:
 				this.enterOuterAlt(_localctx, 3);
 				{
-				this.state = 408;
+				this.state = 418;
 				this.match(CashScriptParser.StringLiteral);
 				}
 				break;
 			case CashScriptParser.DateLiteral:
 				this.enterOuterAlt(_localctx, 4);
 				{
-				this.state = 409;
+				this.state = 419;
 				this.match(CashScriptParser.DateLiteral);
 				}
 				break;
 			case CashScriptParser.HexLiteral:
 				this.enterOuterAlt(_localctx, 5);
 				{
-				this.state = 410;
+				this.state = 420;
 				this.match(CashScriptParser.HexLiteral);
 				}
 				break;
@@ -2150,14 +2201,14 @@ export class CashScriptParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 413;
+			this.state = 423;
 			this.match(CashScriptParser.NumberLiteral);
-			this.state = 415;
+			this.state = 425;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 34, this._ctx) ) {
 			case 1:
 				{
-				this.state = 414;
+				this.state = 424;
 				this.match(CashScriptParser.NumberUnit);
 				}
 				break;
@@ -2186,9 +2237,9 @@ export class CashScriptParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 417;
+			this.state = 427;
 			_la = this._input.LA(1);
-			if (!(((((_la - 54)) & ~0x1F) === 0 && ((1 << (_la - 54)) & ((1 << (CashScriptParser.T__53 - 54)) | (1 << (CashScriptParser.T__54 - 54)) | (1 << (CashScriptParser.T__55 - 54)) | (1 << (CashScriptParser.T__56 - 54)) | (1 << (CashScriptParser.T__57 - 54)) | (1 << (CashScriptParser.T__58 - 54)) | (1 << (CashScriptParser.Bytes - 54)))) !== 0))) {
+			if (!(((((_la - 57)) & ~0x1F) === 0 && ((1 << (_la - 57)) & ((1 << (CashScriptParser.T__56 - 57)) | (1 << (CashScriptParser.T__57 - 57)) | (1 << (CashScriptParser.T__58 - 57)) | (1 << (CashScriptParser.T__59 - 57)) | (1 << (CashScriptParser.T__60 - 57)) | (1 << (CashScriptParser.T__61 - 57)) | (1 << (CashScriptParser.Bytes - 57)))) !== 0))) {
 			this._errHandler.recoverInline(this);
 			} else {
 				if (this._input.LA(1) === Token.EOF) {
@@ -2225,46 +2276,49 @@ export class CashScriptParser extends Parser {
 	private expression_sempred(_localctx: ExpressionContext, predIndex: number): boolean {
 		switch (predIndex) {
 		case 0:
-			return this.precpred(this._ctx, 13);
+			return this.precpred(this._ctx, 14);
 
 		case 1:
-			return this.precpred(this._ctx, 12);
+			return this.precpred(this._ctx, 13);
 
 		case 2:
-			return this.precpred(this._ctx, 11);
+			return this.precpred(this._ctx, 12);
 
 		case 3:
-			return this.precpred(this._ctx, 10);
+			return this.precpred(this._ctx, 11);
 
 		case 4:
-			return this.precpred(this._ctx, 9);
+			return this.precpred(this._ctx, 10);
 
 		case 5:
-			return this.precpred(this._ctx, 8);
+			return this.precpred(this._ctx, 9);
 
 		case 6:
-			return this.precpred(this._ctx, 7);
+			return this.precpred(this._ctx, 8);
 
 		case 7:
-			return this.precpred(this._ctx, 6);
+			return this.precpred(this._ctx, 7);
 
 		case 8:
-			return this.precpred(this._ctx, 5);
+			return this.precpred(this._ctx, 6);
 
 		case 9:
-			return this.precpred(this._ctx, 24);
+			return this.precpred(this._ctx, 5);
 
 		case 10:
-			return this.precpred(this._ctx, 16);
+			return this.precpred(this._ctx, 26);
 
 		case 11:
-			return this.precpred(this._ctx, 15);
+			return this.precpred(this._ctx, 17);
+
+		case 12:
+			return this.precpred(this._ctx, 16);
 		}
 		return true;
 	}
 
 	public static readonly _serializedATN: string =
-		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03L\u01A6\x04\x02" +
+		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03P\u01B0\x04\x02" +
 		"\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04\x07" +
 		"\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r\x04" +
 		"\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t\x12\x04" +
@@ -2300,175 +2354,180 @@ export class CashScriptParser extends Parser {
 		"\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E" +
 		"\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E" +
 		"\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E" +
-		"\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x07\x1E\u015B" +
-		"\n\x1E\f\x1E\x0E\x1E\u015E\v\x1E\x03\x1E\x05\x1E\u0161\n\x1E\x05\x1E\u0163" +
-		"\n\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x05\x1E\u0169\n\x1E\x03\x1E\x03" +
+		"\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E" +
+		"\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x07\x1E\u0162\n\x1E\f\x1E\x0E" +
+		"\x1E\u0165\v\x1E\x03\x1E\x05\x1E\u0168\n\x1E\x05\x1E\u016A\n\x1E\x03\x1E" +
+		"\x03\x1E\x03\x1E\x03\x1E\x05\x1E\u0170\n\x1E\x03\x1E\x03\x1E\x03\x1E\x03" +
 		"\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03" +
 		"\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03" +
 		"\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03" +
 		"\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03\x1E\x03" +
-		"\x1E\x03\x1E\x07\x1E\u0192\n\x1E\f\x1E\x0E\x1E\u0195\v\x1E\x03\x1F\x03" +
-		"\x1F\x03 \x03 \x03 \x03 \x03 \x05 \u019E\n \x03!\x03!\x05!\u01A2\n!\x03" +
-		"\"\x03\"\x03\"\x02\x02\x03:#\x02\x02\x04\x02\x06\x02\b\x02\n\x02\f\x02" +
-		"\x0E\x02\x10\x02\x12\x02\x14\x02\x16\x02\x18\x02\x1A\x02\x1C\x02\x1E\x02" +
-		" \x02\"\x02$\x02&\x02(\x02*\x02,\x02.\x020\x022\x024\x026\x028\x02:\x02" +
-		"<\x02>\x02@\x02B\x02\x02\f\x03\x02\x06\f\x04\x02FFII\x03\x02\x1A\x1E\x03" +
-		"\x02+,\x03\x02-/\x04\x02,,00\x03\x02\b\v\x03\x0212\x03\x02()\x04\x028" +
-		"=BB\x02\u01C9\x02G\x03\x02\x02\x02\x04M\x03\x02\x02\x02\x06R\x03\x02\x02" +
-		"\x02\bT\x03\x02\x02\x02\nY\x03\x02\x02\x02\f]\x03\x02\x02\x02\x0E_\x03" +
-		"\x02\x02\x02\x10u\x03\x02\x02\x02\x12\x88\x03\x02\x02\x02\x14\x8B\x03" +
-		"\x02\x02\x02\x16\x91\x03\x02\x02\x02\x18\x94\x03\x02\x02\x02\x1A\x9F\x03" +
-		"\x02\x02\x02\x1C\xAF\x03\x02\x02\x02\x1E\xBE\x03\x02\x02\x02 \xC9\x03" +
-		"\x02\x02\x02\"\xCB\x03\x02\x02\x02$\xD4\x03\x02\x02\x02&\xDD\x03\x02\x02" +
-		"\x02(\xE2\x03\x02\x02\x02*\xEA\x03\x02\x02\x02,\xF0\x03\x02\x02\x02.\xF9" +
-		"\x03\x02\x02\x020\xFC\x03\x02\x02\x022\u0102\x03\x02\x02\x024\u0105\x03" +
-		"\x02\x02\x026\u010A\x03\x02\x02\x028\u0110\x03\x02\x02\x02:\u0168\x03" +
-		"\x02\x02\x02<\u0196\x03\x02\x02\x02>\u019D\x03\x02\x02\x02@\u019F\x03" +
-		"\x02\x02\x02B\u01A3\x03\x02\x02\x02DF\x05\x04\x03\x02ED\x03\x02\x02\x02" +
-		"FI\x03\x02\x02\x02GE\x03\x02\x02\x02GH\x03\x02\x02\x02HJ\x03\x02\x02\x02" +
-		"IG\x03\x02\x02\x02JK\x05\x0E\b\x02KL\x07\x02\x02\x03L\x03\x03\x02\x02" +
-		"\x02MN\x07\x03\x02\x02NO\x05\x06\x04\x02OP\x05\b\x05\x02PQ\x07\x04\x02" +
-		"\x02Q\x05\x03\x02\x02\x02RS\x07\x05\x02\x02S\x07\x03\x02\x02\x02TV\x05" +
-		"\n\x06\x02UW\x05\n\x06\x02VU\x03\x02\x02\x02VW\x03\x02\x02\x02W\t\x03" +
-		"\x02\x02\x02XZ\x05\f\x07\x02YX\x03\x02\x02\x02YZ\x03\x02\x02\x02Z[\x03" +
-		"\x02\x02\x02[\\\x07>\x02\x02\\\v\x03\x02\x02\x02]^\t\x02\x02\x02^\r\x03" +
-		"\x02\x02\x02_`\x07\r\x02\x02`a\x07I\x02\x02ad\x05\x1A\x0E\x02bc\x07\x0E" +
-		"\x02\x02ce\x05\x1A\x0E\x02db\x03\x02\x02\x02de\x03\x02\x02\x02ef\x03\x02" +
-		"\x02\x02fh\x07\x0F\x02\x02gi\x05\x14\v\x02hg\x03\x02\x02\x02hi\x03\x02" +
-		"\x02\x02im\x03\x02\x02\x02jl\x05 \x11\x02kj\x03\x02\x02\x02lo\x03\x02" +
-		"\x02\x02mk\x03\x02\x02\x02mn\x03\x02\x02\x02nq\x03\x02\x02\x02om\x03\x02" +
-		"\x02\x02pr\x05\x10\t\x02qp\x03\x02\x02\x02qr\x03\x02\x02\x02rs\x03\x02" +
-		"\x02\x02st\x07\x10\x02\x02t\x0F\x03\x02\x02\x02uv\x07\x11\x02\x02v\x82" +
-		"\x07\x0F\x02\x02w|\x05\x18\r\x02xy\x07\x12\x02\x02y{\x05\x18\r\x02zx\x03" +
-		"\x02\x02\x02{~\x03\x02\x02\x02|z\x03\x02\x02\x02|}\x03\x02\x02\x02}\x80" +
-		"\x03\x02\x02\x02~|\x03\x02\x02\x02\x7F\x81\x07\x12\x02\x02\x80\x7F\x03" +
-		"\x02\x02\x02\x80\x81\x03\x02\x02\x02\x81\x83\x03\x02\x02\x02\x82w\x03" +
-		"\x02\x02\x02\x82\x83\x03\x02\x02\x02\x83\x84\x03\x02\x02\x02\x84\x86\x07" +
-		"\x10\x02\x02\x85\x87\x07\x04\x02\x02\x86\x85\x03\x02\x02\x02\x86\x87\x03" +
-		"\x02\x02\x02\x87\x11\x03\x02\x02\x02\x88\x89\x07I\x02\x02\x89\x13\x03" +
-		"\x02\x02\x02\x8A\x8C\x05 \x11\x02\x8B\x8A\x03\x02\x02\x02\x8C\x8D\x03" +
-		"\x02\x02\x02\x8D\x8B\x03\x02\x02\x02\x8D\x8E\x03\x02\x02\x02\x8E\x8F\x03" +
-		"\x02\x02\x02\x8F\x90\x05\x16\f\x02\x90\x15\x03\x02\x02\x02\x91\x92\x07" +
-		"\x13\x02\x02\x92\x93\x07\x04\x02\x02\x93\x17\x03\x02\x02\x02\x94\x95\x07" +
-		"I\x02\x02\x95\x96\x05\x1A\x0E\x02\x96\x9A\x07\x0F\x02\x02\x97\x99\x05" +
-		" \x11\x02\x98\x97\x03\x02\x02\x02\x99\x9C\x03\x02\x02\x02\x9A\x98\x03" +
-		"\x02\x02\x02\x9A\x9B\x03\x02\x02\x02\x9B\x9D\x03\x02\x02\x02\x9C\x9A\x03" +
-		"\x02\x02\x02\x9D\x9E\x07\x10\x02\x02\x9E\x19\x03\x02\x02\x02\x9F\xAB\x07" +
-		"\x14\x02\x02\xA0\xA5\x05\x1C\x0F\x02\xA1\xA2\x07\x12\x02\x02\xA2\xA4\x05" +
-		"\x1C\x0F\x02\xA3\xA1\x03\x02\x02\x02\xA4\xA7\x03\x02\x02\x02\xA5\xA3\x03" +
-		"\x02\x02\x02\xA5\xA6\x03\x02\x02\x02\xA6\xA9\x03\x02\x02\x02\xA7\xA5\x03" +
-		"\x02\x02\x02\xA8\xAA\x07\x12\x02\x02\xA9\xA8\x03\x02\x02\x02\xA9\xAA\x03" +
-		"\x02\x02\x02\xAA\xAC\x03\x02\x02\x02\xAB\xA0\x03\x02\x02\x02\xAB\xAC\x03" +
-		"\x02\x02\x02\xAC\xAD\x03\x02\x02\x02\xAD\xAE\x07\x15\x02\x02\xAE\x1B\x03" +
-		"\x02\x02\x02\xAF\xB1\x05B\"\x02\xB0\xB2\x05<\x1F\x02\xB1\xB0\x03\x02\x02" +
-		"\x02\xB1\xB2\x03\x02\x02\x02\xB2\xB3\x03\x02\x02\x02\xB3\xB4\x07I\x02" +
-		"\x02\xB4\x1D\x03\x02\x02\x02\xB5\xB9\x07\x0F\x02\x02\xB6\xB8\x05 \x11" +
-		"\x02\xB7\xB6\x03\x02\x02\x02\xB8\xBB\x03\x02\x02\x02\xB9\xB7\x03\x02\x02" +
-		"\x02\xB9\xBA\x03\x02\x02\x02\xBA\xBC\x03\x02\x02\x02\xBB\xB9\x03\x02\x02" +
-		"\x02\xBC\xBF\x07\x10\x02\x02\xBD\xBF\x05 \x11\x02\xBE\xB5\x03\x02\x02" +
-		"\x02\xBE\xBD\x03\x02\x02\x02\xBF\x1F\x03\x02\x02\x02\xC0\xCA\x05\"\x12" +
-		"\x02\xC1\xCA\x05$\x13\x02\xC2\xCA\x05&\x14\x02\xC3\xCA\x05(\x15\x02\xC4" +
-		"\xCA\x05*\x16\x02\xC5\xCA\x05,\x17\x02\xC6\xCA\x050\x19\x02\xC7\xCA\x05" +
-		"2\x1A\x02\xC8\xCA\x056\x1C\x02\xC9\xC0\x03\x02\x02\x02\xC9\xC1\x03\x02" +
-		"\x02\x02\xC9\xC2\x03\x02\x02\x02\xC9\xC3\x03\x02\x02\x02\xC9\xC4\x03\x02" +
-		"\x02\x02\xC9\xC5\x03\x02\x02\x02\xC9\xC6\x03\x02\x02\x02\xC9\xC7\x03\x02" +
-		"\x02\x02\xC9\xC8\x03\x02\x02\x02\xCA!\x03\x02\x02\x02\xCB\xCD\x05B\"\x02" +
-		"\xCC\xCE\x05<\x1F\x02\xCD\xCC\x03\x02\x02\x02\xCD\xCE\x03\x02\x02\x02" +
-		"\xCE\xCF\x03\x02\x02\x02\xCF\xD0\x07I\x02\x02\xD0\xD1\x07\f\x02\x02\xD1" +
-		"\xD2\x05:\x1E\x02\xD2\xD3\x07\x04\x02\x02\xD3#\x03\x02\x02\x02\xD4\xD5" +
-		"\x05B\"\x02\xD5\xD6\x07I\x02\x02\xD6\xD7\x07\x12\x02\x02\xD7\xD8\x05B" +
-		"\"\x02\xD8\xD9\x07I\x02\x02\xD9\xDA\x07\f\x02\x02\xDA\xDB\x05:\x1E\x02" +
-		"\xDB\xDC\x07\x04\x02\x02\xDC%\x03\x02\x02\x02\xDD\xDE\x07I\x02\x02\xDE" +
-		"\xDF\x07\f\x02\x02\xDF\xE0\x05:\x1E\x02\xE0\xE1\x07\x04\x02\x02\xE1\'" +
-		"\x03\x02\x02\x02\xE2\xE3\x07\x16\x02\x02\xE3\xE4\x07\x14\x02\x02\xE4\xE5" +
-		"\x07G\x02\x02\xE5\xE6\x07\b\x02\x02\xE6\xE7\x05:\x1E\x02\xE7\xE8\x07\x15" +
-		"\x02\x02\xE8\xE9\x07\x04\x02\x02\xE9)\x03\x02\x02\x02\xEA\xEB\x07\x16" +
-		"\x02\x02\xEB\xEC\x07\x14\x02\x02\xEC\xED\x05:\x1E\x02\xED\xEE\x07\x15" +
-		"\x02\x02\xEE\xEF\x07\x04\x02\x02\xEF+\x03\x02\x02\x02\xF0\xF1\x07\x17" +
-		"\x02\x02\xF1\xF2\x07\x14\x02\x02\xF2\xF3\x05:\x1E\x02\xF3\xF4\x07\x15" +
-		"\x02\x02\xF4\xF7\x05\x1E\x10\x02\xF5\xF6\x07\x18\x02\x02\xF6\xF8\x05\x1E" +
-		"\x10\x02\xF7\xF5\x03\x02\x02\x02\xF7\xF8\x03\x02\x02\x02\xF8-\x03\x02" +
-		"\x02\x02\xF9\xFA\x07I\x02\x02\xFA\xFB\x058\x1D\x02\xFB/\x03\x02\x02\x02" +
-		"\xFC\xFD\x07\x19\x02\x02\xFD\xFE\x07\x14\x02\x02\xFE\xFF\t\x03\x02\x02" +
-		"\xFF\u0100\x07\x15\x02\x02\u0100\u0101\x07\x04\x02\x02\u01011\x03\x02" +
-		"\x02\x02\u0102\u0103\x054\x1B\x02\u0103\u0104\x07\x04\x02\x02\u01043\x03" +
-		"\x02\x02\x02\u0105\u0106\t\x04\x02\x02\u0106\u0107\x07\x14\x02\x02\u0107" +
-		"\u0108\t\x03\x02\x02\u0108\u0109\x07\x15\x02\x02\u01095\x03\x02\x02\x02" +
-		"\u010A\u010B\x07\x1F\x02\x02\u010B\u010C\x07\x14\x02\x02\u010C\u010D\x07" +
-		"I\x02\x02\u010D\u010E\x07\x15\x02\x02\u010E\u010F\x07\x04\x02\x02\u010F" +
-		"7\x03\x02\x02\x02\u0110\u011C\x07\x14\x02\x02\u0111\u0116\x05:\x1E\x02" +
-		"\u0112\u0113\x07\x12\x02\x02\u0113\u0115\x05:\x1E\x02\u0114\u0112\x03" +
-		"\x02\x02\x02\u0115\u0118\x03\x02\x02\x02\u0116\u0114\x03\x02\x02\x02\u0116" +
-		"\u0117\x03\x02\x02\x02\u0117\u011A\x03\x02\x02\x02\u0118\u0116\x03\x02" +
-		"\x02\x02\u0119\u011B\x07\x12\x02\x02\u011A\u0119\x03\x02\x02\x02\u011A" +
-		"\u011B\x03\x02\x02\x02\u011B\u011D\x03\x02\x02\x02\u011C\u0111\x03\x02" +
-		"\x02\x02\u011C\u011D\x03\x02\x02\x02\u011D\u011E\x03\x02\x02\x02\u011E" +
-		"\u011F\x07\x15\x02\x02\u011F9\x03\x02\x02\x02\u0120\u0121\b\x1E\x01\x02" +
-		"\u0121\u0122\x07\x14\x02\x02\u0122\u0123\x05:\x1E\x02\u0123\u0124\x07" +
-		"\x15\x02\x02\u0124\u0169\x03\x02\x02\x02\u0125\u0126\x05B\"\x02\u0126" +
-		"\u0127\x07\x14\x02\x02\u0127\u012A\x05:\x1E\x02\u0128\u0129\x07\x12\x02" +
-		"\x02\u0129\u012B\x05:\x1E\x02\u012A\u0128\x03\x02\x02\x02\u012A\u012B" +
-		"\x03\x02\x02\x02\u012B\u012D\x03\x02\x02\x02\u012C\u012E\x07\x12\x02\x02" +
-		"\u012D\u012C\x03\x02\x02\x02\u012D\u012E\x03\x02\x02\x02\u012E\u012F\x03" +
-		"\x02\x02\x02\u012F\u0130\x07\x15\x02\x02\u0130\u0169\x03\x02\x02\x02\u0131" +
-		"\u0169\x05.\x18\x02\u0132\u0133\x07 \x02\x02\u0133\u0134\x07I\x02\x02" +
-		"\u0134\u0169\x058\x1D\x02\u0135\u0136\x07#\x02\x02\u0136\u0137\x07!\x02" +
-		"\x02\u0137\u0138\x05:\x1E\x02\u0138\u0139\x07\"\x02\x02\u0139\u013A\x07" +
-		"$\x02\x02\u013A\u013B\x07I\x02\x02\u013B\u0169\x03\x02\x02\x02\u013C\u013D" +
-		"\x07%\x02\x02\u013D\u013E\x07!\x02\x02\u013E\u013F\x05:\x1E\x02\u013F" +
-		"\u0140\x07\"\x02\x02\u0140\u0141\x07$\x02\x02\u0141\u0142\x07I\x02\x02" +
-		"\u0142\u0169\x03\x02\x02\x02\u0143\u0144\x07#\x02\x02\u0144\u0145\x07" +
-		"$\x02\x02\u0145\u0146\x07I\x02\x02\u0146\u0169\x058\x1D\x02\u0147\u0148" +
-		"\x07%\x02\x02\u0148\u0149\x07$\x02\x02\u0149\u014A\x07I\x02\x02\u014A" +
-		"\u0169\x058\x1D\x02\u014B\u014C\x07&\x02\x02\u014C\u014D\x07$\x02\x02" +
-		"\u014D\u014E\x07I\x02\x02\u014E\u0169\x058\x1D\x02\u014F\u0150\x07\'\x02" +
-		"\x02\u0150\u0151\x07$\x02\x02\u0151\u0152\x07I\x02\x02\u0152\u0169\x05" +
-		"8\x1D\x02\u0153\u0169\x054\x1B\x02\u0154\u0155\t\x05\x02\x02\u0155\u0169" +
-		"\x05:\x1E\x10\u0156\u0162\x07!\x02\x02\u0157\u015C\x05:\x1E\x02\u0158" +
-		"\u0159\x07\x12\x02\x02\u0159\u015B\x05:\x1E\x02\u015A\u0158\x03\x02\x02" +
-		"\x02\u015B\u015E\x03\x02\x02\x02\u015C\u015A\x03\x02\x02\x02\u015C\u015D" +
-		"\x03\x02\x02\x02\u015D\u0160\x03\x02\x02\x02\u015E\u015C\x03\x02\x02\x02" +
-		"\u015F\u0161\x07\x12\x02\x02\u0160\u015F\x03\x02\x02\x02\u0160\u0161\x03" +
-		"\x02\x02\x02\u0161\u0163\x03\x02\x02\x02\u0162\u0157\x03\x02\x02\x02\u0162" +
-		"\u0163\x03\x02\x02\x02\u0163\u0164\x03\x02\x02\x02\u0164\u0169\x07\"\x02" +
-		"\x02\u0165\u0169\x07H\x02\x02\u0166\u0169\x07I\x02\x02\u0167\u0169\x05" +
-		"> \x02\u0168\u0120\x03\x02\x02\x02\u0168\u0125\x03\x02\x02\x02\u0168\u0131" +
-		"\x03\x02\x02\x02\u0168\u0132\x03\x02\x02\x02\u0168\u0135\x03\x02\x02\x02" +
-		"\u0168\u013C\x03\x02\x02\x02\u0168\u0143\x03\x02\x02\x02\u0168\u0147\x03" +
-		"\x02\x02\x02\u0168\u014B\x03\x02\x02\x02\u0168\u014F\x03\x02\x02\x02\u0168" +
-		"\u0153\x03\x02\x02\x02\u0168\u0154\x03\x02\x02\x02\u0168\u0156\x03\x02" +
-		"\x02\x02\u0168\u0165\x03\x02\x02\x02\u0168\u0166\x03\x02\x02\x02\u0168" +
-		"\u0167\x03\x02\x02\x02\u0169\u0193\x03\x02\x02\x02\u016A\u016B\f\x0F\x02" +
-		"\x02\u016B\u016C\t\x06\x02\x02\u016C\u0192\x05:\x1E\x10\u016D\u016E\f" +
-		"\x0E\x02\x02\u016E\u016F\t\x07\x02\x02\u016F\u0192\x05:\x1E\x0F\u0170" +
-		"\u0171\f\r\x02\x02\u0171\u0172\t\b\x02\x02\u0172\u0192\x05:\x1E\x0E\u0173" +
-		"\u0174\f\f\x02\x02\u0174\u0175\t\t\x02\x02\u0175\u0192\x05:\x1E\r\u0176" +
-		"\u0177\f\v\x02\x02\u0177\u0178\x073\x02\x02\u0178\u0192\x05:\x1E\f\u0179" +
-		"\u017A\f\n\x02\x02\u017A\u017B\x07\x06\x02\x02\u017B\u0192\x05:\x1E\v" +
-		"\u017C\u017D\f\t\x02\x02\u017D\u017E\x074\x02\x02\u017E\u0192\x05:\x1E" +
-		"\n\u017F\u0180\f\b\x02\x02\u0180\u0181\x075\x02\x02\u0181\u0192\x05:\x1E" +
-		"\t\u0182\u0183\f\x07\x02\x02\u0183\u0184\x076\x02\x02\u0184\u0192\x05" +
-		":\x1E\b\u0185\u0186\f\x1A\x02\x02\u0186\u0187\x07!\x02\x02\u0187\u0188" +
-		"\x07A\x02\x02\u0188\u0192\x07\"\x02\x02\u0189\u018A\f\x12\x02\x02\u018A" +
-		"\u0192\t\n\x02\x02\u018B\u018C\f\x11\x02\x02\u018C\u018D\x07*\x02\x02" +
-		"\u018D\u018E\x07\x14\x02\x02\u018E\u018F\x05:\x1E\x02\u018F\u0190\x07" +
-		"\x15\x02\x02\u0190\u0192\x03\x02\x02\x02\u0191\u016A\x03\x02\x02\x02\u0191" +
-		"\u016D\x03\x02\x02\x02\u0191\u0170\x03\x02\x02\x02\u0191\u0173\x03\x02" +
-		"\x02\x02\u0191\u0176\x03\x02\x02\x02\u0191\u0179\x03\x02\x02\x02\u0191" +
-		"\u017C\x03\x02\x02\x02\u0191\u017F\x03\x02\x02\x02\u0191\u0182\x03\x02" +
-		"\x02\x02\u0191\u0185\x03\x02\x02\x02\u0191\u0189\x03\x02\x02\x02\u0191" +
-		"\u018B\x03\x02\x02\x02\u0192\u0195\x03\x02\x02\x02\u0193\u0191\x03\x02" +
-		"\x02\x02\u0193\u0194\x03\x02\x02\x02\u0194;\x03\x02\x02\x02\u0195\u0193" +
-		"\x03\x02\x02\x02\u0196\u0197\x077\x02\x02\u0197=\x03\x02\x02\x02\u0198" +
-		"\u019E\x07?\x02\x02\u0199\u019E\x05@!\x02\u019A\u019E\x07D\x02\x02\u019B" +
-		"\u019E\x07E\x02\x02\u019C\u019E\x07F\x02\x02\u019D\u0198\x03\x02\x02\x02" +
-		"\u019D\u0199\x03\x02\x02\x02\u019D\u019A\x03\x02\x02\x02\u019D\u019B\x03" +
-		"\x02\x02\x02\u019D\u019C\x03\x02\x02\x02\u019E?\x03\x02\x02\x02\u019F" +
-		"\u01A1\x07A\x02\x02\u01A0\u01A2\x07@\x02\x02\u01A1\u01A0\x03\x02\x02\x02" +
-		"\u01A1\u01A2\x03\x02\x02\x02\u01A2A\x03\x02\x02\x02\u01A3\u01A4\t\v\x02" +
-		"\x02\u01A4C\x03\x02\x02\x02%GVYdhmq|\x80\x82\x86\x8D\x9A\xA5\xA9\xAB\xB1" +
-		"\xB9\xBE\xC9\xCD\xF7\u0116\u011A\u011C\u012A\u012D\u015C\u0160\u0162\u0168" +
-		"\u0191\u0193\u019D\u01A1";
+		"\x1E\x03\x1E\x03\x1E\x07\x1E\u019C\n\x1E\f\x1E\x0E\x1E\u019F\v\x1E\x03" +
+		"\x1F\x03\x1F\x03 \x03 \x03 \x03 \x03 \x05 \u01A8\n \x03!\x03!\x05!\u01AC" +
+		"\n!\x03\"\x03\"\x03\"\x02\x02\x03:#\x02\x02\x04\x02\x06\x02\b\x02\n\x02" +
+		"\f\x02\x0E\x02\x10\x02\x12\x02\x14\x02\x16\x02\x18\x02\x1A\x02\x1C\x02" +
+		"\x1E\x02 \x02\"\x02$\x02&\x02(\x02*\x02,\x02.\x020\x022\x024\x026\x02" +
+		"8\x02:\x02<\x02>\x02@\x02B\x02\x02\r\x03\x02\x06\f\x04\x02IIMM\x03\x02" +
+		"\x1A\x1E\x03\x02,-\x03\x02.0\x04\x02--11\x03\x0223\x03\x02\b\v\x03\x02" +
+		"45\x03\x02)*\x04\x02;@EE\x02\u01D5\x02G\x03\x02\x02\x02\x04M\x03\x02\x02" +
+		"\x02\x06R\x03\x02\x02\x02\bT\x03\x02\x02\x02\nY\x03\x02\x02\x02\f]\x03" +
+		"\x02\x02\x02\x0E_\x03\x02\x02\x02\x10u\x03\x02\x02\x02\x12\x88\x03\x02" +
+		"\x02\x02\x14\x8B\x03\x02\x02\x02\x16\x91\x03\x02\x02\x02\x18\x94\x03\x02" +
+		"\x02\x02\x1A\x9F\x03\x02\x02\x02\x1C\xAF\x03\x02\x02\x02\x1E\xBE\x03\x02" +
+		"\x02\x02 \xC9\x03\x02\x02\x02\"\xCB\x03\x02\x02\x02$\xD4\x03\x02\x02\x02" +
+		"&\xDD\x03\x02\x02\x02(\xE2\x03\x02\x02\x02*\xEA\x03\x02\x02\x02,\xF0\x03" +
+		"\x02\x02\x02.\xF9\x03\x02\x02\x020\xFC\x03\x02\x02\x022\u0102\x03\x02" +
+		"\x02\x024\u0105\x03\x02\x02\x026\u010A\x03\x02\x02\x028\u0110\x03\x02" +
+		"\x02\x02:\u016F\x03\x02\x02\x02<\u01A0\x03\x02\x02\x02>\u01A7\x03\x02" +
+		"\x02\x02@\u01A9\x03\x02\x02\x02B\u01AD\x03\x02\x02\x02DF\x05\x04\x03\x02" +
+		"ED\x03\x02\x02\x02FI\x03\x02\x02\x02GE\x03\x02\x02\x02GH\x03\x02\x02\x02" +
+		"HJ\x03\x02\x02\x02IG\x03\x02\x02\x02JK\x05\x0E\b\x02KL\x07\x02\x02\x03" +
+		"L\x03\x03\x02\x02\x02MN\x07\x03\x02\x02NO\x05\x06\x04\x02OP\x05\b\x05" +
+		"\x02PQ\x07\x04\x02\x02Q\x05\x03\x02\x02\x02RS\x07\x05\x02\x02S\x07\x03" +
+		"\x02\x02\x02TV\x05\n\x06\x02UW\x05\n\x06\x02VU\x03\x02\x02\x02VW\x03\x02" +
+		"\x02\x02W\t\x03\x02\x02\x02XZ\x05\f\x07\x02YX\x03\x02\x02\x02YZ\x03\x02" +
+		"\x02\x02Z[\x03\x02\x02\x02[\\\x07A\x02\x02\\\v\x03\x02\x02\x02]^\t\x02" +
+		"\x02\x02^\r\x03\x02\x02\x02_`\x07\r\x02\x02`a\x07M\x02\x02ad\x05\x1A\x0E" +
+		"\x02bc\x07\x0E\x02\x02ce\x05\x1A\x0E\x02db\x03\x02\x02\x02de\x03\x02\x02" +
+		"\x02ef\x03\x02\x02\x02fh\x07\x0F\x02\x02gi\x05\x14\v\x02hg\x03\x02\x02" +
+		"\x02hi\x03\x02\x02\x02im\x03\x02\x02\x02jl\x05 \x11\x02kj\x03\x02\x02" +
+		"\x02lo\x03\x02\x02\x02mk\x03\x02\x02\x02mn\x03\x02\x02\x02nq\x03\x02\x02" +
+		"\x02om\x03\x02\x02\x02pr\x05\x10\t\x02qp\x03\x02\x02\x02qr\x03\x02\x02" +
+		"\x02rs\x03\x02\x02\x02st\x07\x10\x02\x02t\x0F\x03\x02\x02\x02uv\x07\x11" +
+		"\x02\x02v\x82\x07\x0F\x02\x02w|\x05\x18\r\x02xy\x07\x12\x02\x02y{\x05" +
+		"\x18\r\x02zx\x03\x02\x02\x02{~\x03\x02\x02\x02|z\x03\x02\x02\x02|}\x03" +
+		"\x02\x02\x02}\x80\x03\x02\x02\x02~|\x03\x02\x02\x02\x7F\x81\x07\x12\x02" +
+		"\x02\x80\x7F\x03\x02\x02\x02\x80\x81\x03\x02\x02\x02\x81\x83\x03\x02\x02" +
+		"\x02\x82w\x03\x02\x02\x02\x82\x83\x03\x02\x02\x02\x83\x84\x03\x02\x02" +
+		"\x02\x84\x86\x07\x10\x02\x02\x85\x87\x07\x04\x02\x02\x86\x85\x03\x02\x02" +
+		"\x02\x86\x87\x03\x02\x02\x02\x87\x11\x03\x02\x02\x02\x88\x89\x07M\x02" +
+		"\x02\x89\x13\x03\x02\x02\x02\x8A\x8C\x05 \x11\x02\x8B\x8A\x03\x02\x02" +
+		"\x02\x8C\x8D\x03\x02\x02\x02\x8D\x8B\x03\x02\x02\x02\x8D\x8E\x03\x02\x02" +
+		"\x02\x8E\x8F\x03\x02\x02\x02\x8F\x90\x05\x16\f\x02\x90\x15\x03\x02\x02" +
+		"\x02\x91\x92\x07\x13\x02\x02\x92\x93\x07\x04\x02\x02\x93\x17\x03\x02\x02" +
+		"\x02\x94\x95\x07M\x02\x02\x95\x96\x05\x1A\x0E\x02\x96\x9A\x07\x0F\x02" +
+		"\x02\x97\x99\x05 \x11\x02\x98\x97\x03\x02\x02\x02\x99\x9C\x03\x02\x02" +
+		"\x02\x9A\x98\x03\x02\x02\x02\x9A\x9B\x03\x02\x02\x02\x9B\x9D\x03\x02\x02" +
+		"\x02\x9C\x9A\x03\x02\x02\x02\x9D\x9E\x07\x10\x02\x02\x9E\x19\x03\x02\x02" +
+		"\x02\x9F\xAB\x07\x14\x02\x02\xA0\xA5\x05\x1C\x0F\x02\xA1\xA2\x07\x12\x02" +
+		"\x02\xA2\xA4\x05\x1C\x0F\x02\xA3\xA1\x03\x02\x02\x02\xA4\xA7\x03\x02\x02" +
+		"\x02\xA5\xA3\x03\x02\x02\x02\xA5\xA6\x03\x02\x02\x02\xA6\xA9\x03\x02\x02" +
+		"\x02\xA7\xA5\x03\x02\x02\x02\xA8\xAA\x07\x12\x02\x02\xA9\xA8\x03\x02\x02" +
+		"\x02\xA9\xAA\x03\x02\x02\x02\xAA\xAC\x03\x02\x02\x02\xAB\xA0\x03\x02\x02" +
+		"\x02\xAB\xAC\x03\x02\x02\x02\xAC\xAD\x03\x02\x02\x02\xAD\xAE\x07\x15\x02" +
+		"\x02\xAE\x1B\x03\x02\x02\x02\xAF\xB1\x05B\"\x02\xB0\xB2\x05<\x1F\x02\xB1" +
+		"\xB0\x03\x02\x02\x02\xB1\xB2\x03\x02\x02\x02\xB2\xB3\x03\x02\x02\x02\xB3" +
+		"\xB4\x07M\x02\x02\xB4\x1D\x03\x02\x02\x02\xB5\xB9\x07\x0F\x02\x02\xB6" +
+		"\xB8\x05 \x11\x02\xB7\xB6\x03\x02\x02\x02\xB8\xBB\x03\x02\x02\x02\xB9" +
+		"\xB7\x03\x02\x02\x02\xB9\xBA\x03\x02\x02\x02\xBA\xBC\x03\x02\x02\x02\xBB" +
+		"\xB9\x03\x02\x02\x02\xBC\xBF\x07\x10\x02\x02\xBD\xBF\x05 \x11\x02\xBE" +
+		"\xB5\x03\x02\x02\x02\xBE\xBD\x03\x02\x02\x02\xBF\x1F\x03\x02\x02\x02\xC0" +
+		"\xCA\x05\"\x12\x02\xC1\xCA\x05$\x13\x02\xC2\xCA\x05&\x14\x02\xC3\xCA\x05" +
+		"(\x15\x02\xC4\xCA\x05*\x16\x02\xC5\xCA\x05,\x17\x02\xC6\xCA\x050\x19\x02" +
+		"\xC7\xCA\x052\x1A\x02\xC8\xCA\x056\x1C\x02\xC9\xC0\x03\x02\x02\x02\xC9" +
+		"\xC1\x03\x02\x02\x02\xC9\xC2\x03\x02\x02\x02\xC9\xC3\x03\x02\x02\x02\xC9" +
+		"\xC4\x03\x02\x02\x02\xC9\xC5\x03\x02\x02\x02\xC9\xC6\x03\x02\x02\x02\xC9" +
+		"\xC7\x03\x02\x02\x02\xC9\xC8\x03\x02\x02\x02\xCA!\x03\x02\x02\x02\xCB" +
+		"\xCD\x05B\"\x02\xCC\xCE\x05<\x1F\x02\xCD\xCC\x03\x02\x02\x02\xCD\xCE\x03" +
+		"\x02\x02\x02\xCE\xCF\x03\x02\x02\x02\xCF\xD0\x07M\x02\x02\xD0\xD1\x07" +
+		"\f\x02\x02\xD1\xD2\x05:\x1E\x02\xD2\xD3\x07\x04\x02\x02\xD3#\x03\x02\x02" +
+		"\x02\xD4\xD5\x05B\"\x02\xD5\xD6\x07M\x02\x02\xD6\xD7\x07\x12\x02\x02\xD7" +
+		"\xD8\x05B\"\x02\xD8\xD9\x07M\x02\x02\xD9\xDA\x07\f\x02\x02\xDA\xDB\x05" +
+		":\x1E\x02\xDB\xDC\x07\x04\x02\x02\xDC%\x03\x02\x02\x02\xDD\xDE\x07M\x02" +
+		"\x02\xDE\xDF\x07\f\x02\x02\xDF\xE0\x05:\x1E\x02\xE0\xE1\x07\x04\x02\x02" +
+		"\xE1\'\x03\x02\x02\x02\xE2\xE3\x07\x16\x02\x02\xE3\xE4\x07\x14\x02\x02" +
+		"\xE4\xE5\x07J\x02\x02\xE5\xE6\x07\b\x02\x02\xE6\xE7\x05:\x1E\x02\xE7\xE8" +
+		"\x07\x15\x02\x02\xE8\xE9\x07\x04\x02\x02\xE9)\x03\x02\x02\x02\xEA\xEB" +
+		"\x07\x16\x02\x02\xEB\xEC\x07\x14\x02\x02\xEC\xED\x05:\x1E\x02\xED\xEE" +
+		"\x07\x15\x02\x02\xEE\xEF\x07\x04\x02\x02\xEF+\x03\x02\x02\x02\xF0\xF1" +
+		"\x07\x17\x02\x02\xF1\xF2\x07\x14\x02\x02\xF2\xF3\x05:\x1E\x02\xF3\xF4" +
+		"\x07\x15\x02\x02\xF4\xF7\x05\x1E\x10\x02\xF5\xF6\x07\x18\x02\x02\xF6\xF8" +
+		"\x05\x1E\x10\x02\xF7\xF5\x03\x02\x02\x02\xF7\xF8\x03\x02\x02\x02\xF8-" +
+		"\x03\x02\x02\x02\xF9\xFA\x07M\x02\x02\xFA\xFB\x058\x1D\x02\xFB/\x03\x02" +
+		"\x02\x02\xFC\xFD\x07\x19\x02\x02\xFD\xFE\x07\x14\x02\x02\xFE\xFF\t\x03" +
+		"\x02\x02\xFF\u0100\x07\x15\x02\x02\u0100\u0101\x07\x04\x02\x02\u01011" +
+		"\x03\x02\x02\x02\u0102\u0103\x054\x1B\x02\u0103\u0104\x07\x04\x02\x02" +
+		"\u01043\x03\x02\x02\x02\u0105\u0106\t\x04\x02\x02\u0106\u0107\x07\x14" +
+		"\x02\x02\u0107\u0108\t\x03\x02\x02\u0108\u0109\x07\x15\x02\x02\u01095" +
+		"\x03\x02\x02\x02\u010A\u010B\x07\x1F\x02\x02\u010B\u010C\x07\x14\x02\x02" +
+		"\u010C\u010D\x07M\x02\x02\u010D\u010E\x07\x15\x02\x02\u010E\u010F\x07" +
+		"\x04\x02\x02\u010F7\x03\x02\x02\x02\u0110\u011C\x07\x14\x02\x02\u0111" +
+		"\u0116\x05:\x1E\x02\u0112\u0113\x07\x12\x02\x02\u0113\u0115\x05:\x1E\x02" +
+		"\u0114\u0112\x03\x02\x02\x02\u0115\u0118\x03\x02\x02\x02\u0116\u0114\x03" +
+		"\x02\x02\x02\u0116\u0117\x03\x02\x02\x02\u0117\u011A\x03\x02\x02\x02\u0118" +
+		"\u0116\x03\x02\x02\x02\u0119\u011B\x07\x12\x02\x02\u011A\u0119\x03\x02" +
+		"\x02\x02\u011A\u011B\x03\x02\x02\x02\u011B\u011D\x03\x02\x02\x02\u011C" +
+		"\u0111\x03\x02\x02\x02\u011C\u011D\x03\x02\x02\x02\u011D\u011E\x03\x02" +
+		"\x02\x02\u011E\u011F\x07\x15\x02\x02\u011F9\x03\x02\x02\x02\u0120\u0121" +
+		"\b\x1E\x01\x02\u0121\u0122\x07\x14\x02\x02\u0122\u0123\x05:\x1E\x02\u0123" +
+		"\u0124\x07\x15\x02\x02\u0124\u0170\x03\x02\x02\x02\u0125\u0126\x05B\"" +
+		"\x02\u0126\u0127\x07\x14\x02\x02\u0127\u012A\x05:\x1E\x02\u0128\u0129" +
+		"\x07\x12\x02\x02\u0129\u012B\x05:\x1E\x02\u012A\u0128\x03\x02\x02\x02" +
+		"\u012A\u012B\x03\x02\x02\x02\u012B\u012D\x03\x02\x02\x02\u012C\u012E\x07" +
+		"\x12\x02\x02\u012D\u012C\x03\x02\x02\x02\u012D\u012E\x03\x02\x02\x02\u012E" +
+		"\u012F\x03\x02\x02\x02\u012F\u0130\x07\x15\x02\x02\u0130\u0170\x03\x02" +
+		"\x02\x02\u0131\u0170\x05.\x18\x02\u0132\u0133\x07 \x02\x02\u0133\u0134" +
+		"\x07M\x02\x02\u0134\u0170\x058\x1D\x02\u0135\u0136\x07#\x02\x02\u0136" +
+		"\u0137\x07!\x02\x02\u0137\u0138\x05:\x1E\x02\u0138\u0139\x07\"\x02\x02" +
+		"\u0139\u013A\x07$\x02\x02\u013A\u013B\x07M\x02\x02\u013B\u0170\x03\x02" +
+		"\x02\x02\u013C\u013D\x07%\x02\x02\u013D\u013E\x07!\x02\x02\u013E\u013F" +
+		"\x05:\x1E\x02\u013F\u0140\x07\"\x02\x02\u0140\u0141\x07$\x02\x02\u0141" +
+		"\u0142\x07M\x02\x02\u0142\u0170\x03\x02\x02\x02\u0143\u0144\x07&\x02\x02" +
+		"\u0144\u0145\x07!\x02\x02\u0145\u0146\x05:\x1E\x02\u0146\u0147\x07\"\x02" +
+		"\x02\u0147\u0148\x07$\x02\x02\u0148\u0149\x07K\x02\x02\u0149\u0170\x03" +
+		"\x02\x02\x02\u014A\u014B\x07#\x02\x02\u014B\u014C\x07$\x02\x02\u014C\u014D" +
+		"\x07M\x02\x02\u014D\u0170\x058\x1D\x02\u014E\u014F\x07%\x02\x02\u014F" +
+		"\u0150\x07$\x02\x02\u0150\u0151\x07M\x02\x02\u0151\u0170\x058\x1D\x02" +
+		"\u0152\u0153\x07\'\x02\x02\u0153\u0154\x07$\x02\x02\u0154\u0155\x07M\x02" +
+		"\x02\u0155\u0170\x058\x1D\x02\u0156\u0157\x07(\x02\x02\u0157\u0158\x07" +
+		"$\x02\x02\u0158\u0159\x07M\x02\x02\u0159\u0170\x058\x1D\x02\u015A\u0170" +
+		"\x054\x1B\x02\u015B\u015C\t\x05\x02\x02\u015C\u0170\x05:\x1E\x11\u015D" +
+		"\u0169\x07!\x02\x02\u015E\u0163\x05:\x1E\x02\u015F\u0160\x07\x12\x02\x02" +
+		"\u0160\u0162\x05:\x1E\x02\u0161\u015F\x03\x02\x02\x02\u0162\u0165\x03" +
+		"\x02\x02\x02\u0163\u0161\x03\x02\x02\x02\u0163\u0164\x03\x02\x02\x02\u0164" +
+		"\u0167\x03\x02\x02\x02\u0165\u0163\x03\x02\x02\x02\u0166\u0168\x07\x12" +
+		"\x02\x02\u0167\u0166\x03\x02\x02\x02\u0167\u0168\x03\x02\x02\x02\u0168" +
+		"\u016A\x03\x02\x02\x02\u0169\u015E\x03\x02\x02\x02\u0169\u016A\x03\x02" +
+		"\x02\x02\u016A\u016B\x03\x02\x02\x02\u016B\u0170\x07\"\x02\x02\u016C\u0170" +
+		"\x07L\x02\x02\u016D\u0170\x07M\x02\x02\u016E\u0170\x05> \x02\u016F\u0120" +
+		"\x03\x02\x02\x02\u016F\u0125\x03\x02\x02\x02\u016F\u0131\x03\x02\x02\x02" +
+		"\u016F\u0132\x03\x02\x02\x02\u016F\u0135\x03\x02\x02\x02\u016F\u013C\x03" +
+		"\x02\x02\x02\u016F\u0143\x03\x02\x02\x02\u016F\u014A\x03\x02\x02\x02\u016F" +
+		"\u014E\x03\x02\x02\x02\u016F\u0152\x03\x02\x02\x02\u016F\u0156\x03\x02" +
+		"\x02\x02\u016F\u015A\x03\x02\x02\x02\u016F\u015B\x03\x02\x02\x02\u016F" +
+		"\u015D\x03\x02\x02\x02\u016F\u016C\x03\x02\x02\x02\u016F\u016D\x03\x02" +
+		"\x02\x02\u016F\u016E\x03\x02\x02\x02\u0170\u019D\x03\x02\x02\x02\u0171" +
+		"\u0172\f\x10\x02\x02\u0172\u0173\t\x06\x02\x02\u0173\u019C\x05:\x1E\x11" +
+		"\u0174\u0175\f\x0F\x02\x02\u0175\u0176\t\x07\x02\x02\u0176\u019C\x05:" +
+		"\x1E\x10\u0177\u0178\f\x0E\x02\x02\u0178\u0179\t\b\x02\x02\u0179\u019C" +
+		"\x05:\x1E\x0F\u017A\u017B\f\r\x02\x02\u017B\u017C\t\t\x02\x02\u017C\u019C" +
+		"\x05:\x1E\x0E\u017D\u017E\f\f\x02\x02\u017E\u017F\t\n\x02\x02\u017F\u019C" +
+		"\x05:\x1E\r\u0180\u0181\f\v\x02\x02\u0181\u0182\x076\x02\x02\u0182\u019C" +
+		"\x05:\x1E\f\u0183\u0184\f\n\x02\x02\u0184\u0185\x07\x06\x02\x02\u0185" +
+		"\u019C\x05:\x1E\v\u0186\u0187\f\t\x02\x02\u0187\u0188\x077\x02\x02\u0188" +
+		"\u019C\x05:\x1E\n\u0189\u018A\f\b\x02\x02\u018A\u018B\x078\x02\x02\u018B" +
+		"\u019C\x05:\x1E\t\u018C\u018D\f\x07\x02\x02\u018D\u018E\x079\x02\x02\u018E" +
+		"\u019C\x05:\x1E\b\u018F\u0190\f\x1C\x02\x02\u0190\u0191\x07!\x02\x02\u0191" +
+		"\u0192\x07D\x02\x02\u0192\u019C\x07\"\x02\x02\u0193\u0194\f\x13\x02\x02" +
+		"\u0194\u019C\t\v\x02\x02\u0195\u0196\f\x12\x02\x02\u0196\u0197\x07+\x02" +
+		"\x02\u0197\u0198\x07\x14\x02\x02\u0198\u0199\x05:\x1E\x02\u0199\u019A" +
+		"\x07\x15\x02\x02\u019A\u019C\x03\x02\x02\x02\u019B\u0171\x03\x02\x02\x02" +
+		"\u019B\u0174\x03\x02\x02\x02\u019B\u0177\x03\x02\x02\x02\u019B\u017A\x03" +
+		"\x02\x02\x02\u019B\u017D\x03\x02\x02\x02\u019B\u0180\x03\x02\x02\x02\u019B" +
+		"\u0183\x03\x02\x02\x02\u019B\u0186\x03\x02\x02\x02\u019B\u0189\x03\x02" +
+		"\x02\x02\u019B\u018C\x03\x02\x02\x02\u019B\u018F\x03\x02\x02\x02\u019B" +
+		"\u0193\x03\x02\x02\x02\u019B\u0195\x03\x02\x02\x02\u019C\u019F\x03\x02" +
+		"\x02\x02\u019D\u019B\x03\x02\x02\x02\u019D\u019E\x03\x02\x02\x02\u019E" +
+		";\x03\x02\x02\x02\u019F\u019D\x03\x02\x02\x02\u01A0\u01A1\x07:\x02\x02" +
+		"\u01A1=\x03\x02\x02\x02\u01A2\u01A8\x07B\x02\x02\u01A3\u01A8\x05@!\x02" +
+		"\u01A4\u01A8\x07G\x02\x02\u01A5\u01A8\x07H\x02\x02\u01A6\u01A8\x07I\x02" +
+		"\x02\u01A7\u01A2\x03\x02\x02\x02\u01A7\u01A3\x03\x02\x02\x02\u01A7\u01A4" +
+		"\x03\x02\x02\x02\u01A7\u01A5\x03\x02\x02\x02\u01A7\u01A6\x03\x02\x02\x02" +
+		"\u01A8?\x03\x02\x02\x02\u01A9\u01AB\x07D\x02\x02\u01AA\u01AC\x07C\x02" +
+		"\x02\u01AB\u01AA\x03\x02\x02\x02\u01AB\u01AC\x03\x02\x02\x02\u01ACA\x03" +
+		"\x02\x02\x02\u01AD\u01AE\t\f\x02\x02\u01AEC\x03\x02\x02\x02%GVYdhmq|\x80" +
+		"\x82\x86\x8D\x9A\xA5\xA9\xAB\xB1\xB9\xBE\xC9\xCD\xF7\u0116\u011A\u011C" +
+		"\u012A\u012D\u0163\u0167\u0169\u016F\u019B\u019D\u01A7\u01AB";
 	public static __ATN: ATN;
 	public static get _ATN(): ATN {
 		if (!CashScriptParser.__ATN) {
@@ -3689,7 +3748,8 @@ export class UnaryIntrospectionOpContext extends ExpressionContext {
 	public expression(): ExpressionContext {
 		return this.getRuleContext(0, ExpressionContext);
 	}
-	public Identifier(): TerminalNode { return this.getToken(CashScriptParser.Identifier, 0); }
+	public Identifier(): TerminalNode | undefined { return this.tryGetToken(CashScriptParser.Identifier, 0); }
+	public TxStateField(): TerminalNode | undefined { return this.tryGetToken(CashScriptParser.TxStateField, 0); }
 	constructor(ctx: ExpressionContext) {
 		super(ctx.parent, ctx.invokingState);
 		this.copyFrom(ctx);

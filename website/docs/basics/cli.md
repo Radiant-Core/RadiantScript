@@ -8,7 +8,7 @@ The `rxdc` command line interface is used to compile RadiantScript `.rxd` files 
 You can use `npm` to install the `rxdc` command line tool globally.
 
 ```bash
-npm install -g rxdc
+npm install -g @radiantscript/rxdc
 ```
 
 ## Usage

@@ -39,7 +39,7 @@ contract SimpleToken(bytes20 owner, bytes32 ref) {
 
 ```bash
 # Install the compiler
-npm install -g rxdc
+npm install -g @radiantscript/rxdc
 
 # Compile to artifact
 rxdc token.rxd -o token.json
@@ -187,7 +187,7 @@ All Radiant opcodes are synchronized across the ecosystem:
 
 ### RadiantScript + rxdc
 ```bash
-npm install -g rxdc radiantscript @radiantscript/utils
+npm install -g @radiantscript/rxdc radiantscript @radiantscript/utils
 ```
 
 ### rxdeb

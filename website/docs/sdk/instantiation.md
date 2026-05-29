@@ -25,7 +25,7 @@ A `NetworkProvider` is used to manage network operations for the RadiantScript c
 #### Example
 ```ts
 const { Contract, ElectrumNetworkProvider } = require('radiantscript');
-const { compileFile } = require('rxdc');
+const { compileFile } = require('@radiantscript/rxdc');
 
 // Import an artifact JSON file that was compiled earlier
 const P2PKH = require('./p2pkh.json');
@@ -223,7 +223,7 @@ interface Utxo {
 Generally RadiantScript contracts are compiled to an Artifact JSON file using the CLI compiler. As an alternative to this, RadiantScript contracts can be compiled from within JavaScript apps using the `rxdc` package. This package needs to be installed separately and exports two compilation functions.
 
 ```bash
-npm install rxdc
+npm install @radiantscript/rxdc
 ```
 
 ### compileFile()

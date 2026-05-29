@@ -106,14 +106,14 @@ The exports for library usage of `rxdc` have been updated. All utility-type expo
 
 In v0.5 you could encode a string like this:
 ```js
-const { Data } = require('rxdc');
+const { Data } = require('@radiantscript/rxdc');
 
 const encodedString = Data.encodeString('Hello World');
 ```
 
 While for v0.6 you'd need to use the `utils` export or `@radiantscript/utils`:
 ```js
-const { utils } = require('rxdc');
+const { utils } = require('@radiantscript/rxdc');
 const { encodeString } = require('@radiantscript/utils');
 
 const encodedString = utils.encodeString('Hello World');
@@ -126,14 +126,14 @@ Compilation functions used to be exported as part of the `CashCompiler` object, 
 
 In v0.5 compilation looked like this:
 ```js
-const { CashCompiler } = require('rxdc');
+const { CashCompiler } = require('@radiantscript/rxdc');
 
 const Mecenas = CashCompiler.compileFile(path.join(__dirname, 'mecenas.rxd'));
 ```
 
 In v0.6, this needs to be changed to this:
 ```js
-const { compileFile } = require('rxdc');
+const { compileFile } = require('@radiantscript/rxdc');
 
 const Mecenas = compileFile(path.join(__dirname, 'mecenas.rxd'));
 ```

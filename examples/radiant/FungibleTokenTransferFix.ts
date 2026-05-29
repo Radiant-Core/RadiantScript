@@ -6,7 +6,7 @@ import {
   splitStatefulBytecode,
   hash160,
 } from 'radiantscript';
-import { compileFile } from 'rxdc';
+import { compileFile } from '@radiantscript/rxdc';
 import { PrivateKey } from '@radiant-core/radiantjs';
 import { hexToBin, binToHex } from '@bitauth/libauth';
 

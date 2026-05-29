@@ -114,11 +114,32 @@ Patch — internal changes only; public exports unchanged.
   existing `(actualType, expectedType)` shape so validation errors compile
   without losing precision. Backwards compatible.
 
-### `rxdc` 1.1.0-v2 → **1.1.1-v2**
+### `@radiantscript/rxdc` 1.1.0-v2 → **1.1.1-v2**
 
-Patch — no compiler source changes. Bumped to keep the in-source `version`
-constant aligned with `package.json` (enforced by the new CI version-sync
-guard) and to pull the bumped `@radiantscript/utils`.
+Patch + **renamed**. The package was previously published as the unscoped
+`rxdc` name, but npm's typosquatting filter rejected new `rxdc` publishes
+("too similar to existing packages rx, rfdc, rxjs, rc"). Moved into the
+existing `@radiantscript` org scope alongside `@radiantscript/utils` so
+the publish goes through and the package family stays under one scope.
+
+The CLI binary is still installed as `rxdc` (the `bin` entry in
+`package.json` defines the executable name independently of the package
+name), so `npx rxdc`, `npm install -g @radiantscript/rxdc && rxdc ...`,
+and the compiler's `compilerVersion: "rxdc 1.1.1-v2"` artifact field all
+continue to work. Only the install command and the JavaScript-API import
+specifier change:
+
+```diff
+- npm install rxdc
++ npm install @radiantscript/rxdc
+
+- const { compileFile } = require('rxdc');
++ const { compileFile } = require('@radiantscript/rxdc');
+```
+
+No compiler source changes beyond the rename — bumped to keep the
+in-source `version` constant aligned with `package.json` (enforced by the
+new CI version-sync guard) and to pull the bumped `@radiantscript/utils`.
 
 #### Fixed
 - **24 cashc test-fixture pragmas** bumped from `^0.1.0` (rejecting the current

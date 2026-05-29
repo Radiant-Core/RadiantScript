@@ -8,7 +8,7 @@
  */
 import { instantiateSecp256k1, stringify } from '@bitauth/libauth';
 import { Contract, SignatureTemplate, ElectrumNetworkProvider } from 'radiantscript';
-import { compileFile } from 'rxdc';
+import { compileFile } from '@radiantscript/rxdc';
 import path from 'path';
 import { PriceOracle } from './PriceOracle.js';
 

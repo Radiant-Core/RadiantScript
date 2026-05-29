@@ -1,7 +1,7 @@
 import { BITBOX } from 'bitbox-sdk';
 import { stringify } from '@bitauth/libauth';
 import { Contract, SignatureTemplate, ElectrumNetworkProvider } from 'radiantscript';
-import { compileFile } from 'rxdc';
+import { compileFile } from '@radiantscript/rxdc';
 import path from 'path';
 
 run();

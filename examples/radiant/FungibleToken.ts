@@ -4,7 +4,7 @@ import {
   SignatureTemplate,
   hash160,
 } from 'radiantscript';
-import { compileFile } from 'rxdc';
+import { compileFile } from '@radiantscript/rxdc';
 import { PrivateKey } from '@radiant-core/radiantjs';
 
 // FungibleToken Usage Example

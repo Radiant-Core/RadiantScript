@@ -281,7 +281,11 @@ export class Transaction {
     });
 
     inputScripts.forEach((script, i) => {
-      transaction.inputs[i].unlockingBytecode = script;
+      // libauth narrowed input.unlockingBytecode to Uint8Array<ArrayBuffer>
+      // in v1.19; our helpers return Uint8Array<ArrayBufferLike>. Both wrap
+      // owned (non-Shared) memory in practice, so the variance is a
+      // type-system artefact only.
+      transaction.inputs[i].unlockingBytecode = script as Uint8Array<ArrayBuffer>;
     });
 
     const txHex = binToHex(encodeTransaction(transaction));

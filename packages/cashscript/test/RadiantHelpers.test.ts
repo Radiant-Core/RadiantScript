@@ -225,4 +225,38 @@ describe('splitStatefulBytecode', () => {
     expect(result).not.toBeNull();
     expect(result!.codeScript).toEqual(new Uint8Array([0x53]));
   });
+
+  // ─── Bounds-tightening regression tests (audit §8.2/2) ─────────────────
+  // A push header whose claimed payload extends past the end of the buffer
+  // must be treated as malformed. Without strict bounds, the cursor would
+  // skip past a real separator and the caller would mis-classify a stateful
+  // UTXO as stateless.
+
+  it('returns null for direct push (0x01-0x4b) that claims more than remains', () => {
+    // 0x05 claims 5 bytes follow; only 2 do, then a separator. The buffer
+    // length alone would let the loop terminate without finding the 0xbd,
+    // which is still safe — but malformed input must be flagged either way.
+    const bad = new Uint8Array([0x05, 0xaa, 0xbb, OP_STATESEPARATOR, 0x51]);
+    expect(splitStatefulBytecode(bad)).toBeNull();
+  });
+
+  it('returns null for OP_PUSHDATA1 that claims more than remains', () => {
+    // 0x4c 0x05 claims 5 bytes follow; only 2 do.
+    const bad = new Uint8Array([0x4c, 0x05, 0xaa, 0xbb]);
+    expect(splitStatefulBytecode(bad)).toBeNull();
+  });
+
+  it('returns null for OP_PUSHDATA2 that claims more than remains', () => {
+    // 0x4d 0x05 0x00 claims 5 bytes follow; only 2 do.
+    const bad = new Uint8Array([0x4d, 0x05, 0x00, 0xaa, 0xbb]);
+    expect(splitStatefulBytecode(bad)).toBeNull();
+  });
+
+  it('returns null for OP_PUSHDATA4 with sub-MAX length still overrunning', () => {
+    // 0x4e claims 5 bytes follow; only 1 does. The OLD check
+    // `pushLen > lockingBytecode.length` (5 > 6) is false and would let the
+    // loop fall through; the new check `i + 5 + pushLen > length` catches it.
+    const bad = new Uint8Array([0x4e, 0x05, 0x00, 0x00, 0x00, 0xbd]);
+    expect(splitStatefulBytecode(bad)).toBeNull();
+  });
 });

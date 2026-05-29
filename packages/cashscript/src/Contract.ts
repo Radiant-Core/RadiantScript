@@ -63,15 +63,17 @@ export class Contract {
       encodedArgs as Uint8Array[],
     );
 
-    // Populate the functions object with the contract's functions
-    // (with a special case for single function, which has no "function selector")
+    // Populate the functions object with the contract's functions. The ABI
+    // also contains a `type: 'constructor'` entry (no `name`); skip it here.
+    // Single-function contracts get no "function selector" argument.
     this.functions = {};
-    if (artifact.abi.length === 1) {
-      const f = artifact.abi[0];
-      this.functions[f.name] = this.createFunction(f);
+    const functions = artifact.abi.filter((entry) => entry.type === 'function');
+    if (functions.length === 1) {
+      const f = functions[0];
+      this.functions[f.name!] = this.createFunction(f);
     } else {
-      artifact.abi.forEach((f, i) => {
-        this.functions[f.name] = this.createFunction(f, i);
+      functions.forEach((f, i) => {
+        this.functions[f.name!] = this.createFunction(f, i);
       });
     }
 

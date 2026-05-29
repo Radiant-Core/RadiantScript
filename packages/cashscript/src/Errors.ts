@@ -2,8 +2,18 @@ import { Type } from '@radiantscript/utils';
 import { DUST_LIMIT } from './constants.js';
 
 export class TypeError extends Error {
-  constructor(actual: string, expected: Type) {
-    super(`Found type '${actual}' where type '${expected.toString()}' was expected`);
+  // Two calling conventions:
+  //   new TypeError(actualType, expectedType) — type-mismatch on a typed input
+  //   new TypeError(rawMessage)                — validation failure (DoS-cap,
+  //                                              malformed hex, etc.) where
+  //                                              there is no clean expected
+  //                                              type to compare against
+  constructor(actual: string, expected?: Type) {
+    super(
+      expected === undefined
+        ? actual
+        : `Found type '${actual}' where type '${expected.toString()}' was expected`,
+    );
   }
 }
 

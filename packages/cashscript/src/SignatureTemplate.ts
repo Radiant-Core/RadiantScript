@@ -54,12 +54,17 @@ function decodeWif(wif: string, expectedNetwork?: 'mainnet' | 'testnet'): Uint8A
     throw new Error(result);
   }
 
-  // Validate network if specified
-  if (expectedNetwork && result.network !== expectedNetwork) {
-    throw new Error(
-      `WIF network mismatch: expected ${expectedNetwork}, got ${result.network}. ` +
-      'Ensure you are using the correct network for your private key.'
-    );
+  // libauth returns the network on `type`, which can also carry an
+  // `-uncompressed` suffix (e.g. 'testnet-uncompressed'). Strip the suffix
+  // before comparing so we accept both compressed and uncompressed WIFs.
+  if (expectedNetwork !== undefined) {
+    const actualNetwork = result.type.startsWith('mainnet') ? 'mainnet' : 'testnet';
+    if (actualNetwork !== expectedNetwork) {
+      throw new Error(
+        `WIF network mismatch: expected ${expectedNetwork}, got ${actualNetwork} (libauth type: ${result.type}). `
+        + 'Ensure you are using the correct network for your private key.',
+      );
+    }
   }
 
   return result.privateKey;

@@ -10,6 +10,11 @@ export interface AbiFunction {
   name?: string;
   index?: number;
   params: AbiInput[];
+  // Legacy BCH covenant flag. Radiant uses reference-based introspection
+  // instead of preimage-based covenants, so the compiler never sets this for
+  // RadiantScript contracts. Kept on the interface so size-estimation code
+  // in Transaction.ts can safely read it (always undefined → falsy).
+  covenant?: boolean;
 }
 
 export interface SourceMapEntry {

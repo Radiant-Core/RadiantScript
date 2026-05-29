@@ -155,15 +155,22 @@ export function splitStatefulBytecode(
       };
     }
 
+    // For every push variant, treat a payload that claims to extend past the
+    // end of the buffer as malformed and bail out. Without these bounds, a
+    // crafted push header can advance the cursor past a real OP_STATESEPARATOR
+    // and cause us to mis-classify a stateful UTXO as stateless.
     if (byte >= 0x01 && byte <= 0x4b) {
+      if (i + 1 + byte > lockingBytecode.length) return null;
       i += 1 + byte;
     } else if (byte === 0x4c) {
       if (i + 1 >= lockingBytecode.length) return null;
       const pushLen = lockingBytecode[i + 1];
+      if (i + 2 + pushLen > lockingBytecode.length) return null;
       i += 2 + pushLen;
     } else if (byte === 0x4d) {
       if (i + 2 >= lockingBytecode.length) return null;
       const pushLen = lockingBytecode[i + 1] | (lockingBytecode[i + 2] << 8);
+      if (i + 3 + pushLen > lockingBytecode.length) return null;
       i += 3 + pushLen;
     } else if (byte === 0x4e) {
       if (i + 4 >= lockingBytecode.length) return null;
@@ -171,7 +178,7 @@ export function splitStatefulBytecode(
         | (lockingBytecode[i + 2] << 8)
         | (lockingBytecode[i + 3] << 16)
         | (lockingBytecode[i + 4] << 24)) >>> 0;
-      if (pushLen > lockingBytecode.length) return null;
+      if (i + 5 + pushLen > lockingBytecode.length) return null;
       i += 5 + pushLen;
     } else {
       i += 1;

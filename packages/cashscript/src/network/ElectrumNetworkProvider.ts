@@ -69,7 +69,9 @@ export default class ElectrumNetworkProvider implements NetworkProvider {
       // minWorkers=1 means at least one server must be healthy before requests are served.
       this.electrum = new ElectrumCluster('RadiantScript', '1.4.1', 1, 2, ClusterOrder.PRIORITY);
       this.electrum.addServer('electrumx.radiantcore.org', 443, ElectrumTransport.WSS.Scheme, false);
-      this.electrum.addServer('82.180.136.182', 50012, ElectrumTransport.SSL.Scheme, false);
+      // electrum-cash exposes TLS-over-TCP as TCP_TLS (scheme 'tcp_tls'); the
+      // older alias `SSL` does not exist on the typed surface.
+      this.electrum.addServer('82.180.136.182', 50012, ElectrumTransport.TCP_TLS.Scheme, false);
     } else if (network === Network.TESTNET) {
       // Radiant testnet: pass a custom ElectrumCluster for your testnet RXinDexer node.
       throw new Error(
@@ -153,7 +155,7 @@ export default class ElectrumNetworkProvider implements NetworkProvider {
       this.createTimeout(ElectrumNetworkProvider.REQUEST_TIMEOUT_MS),
     ]);
 
-    let result: RequestResponse;
+    let result: RequestResponse | undefined;
     let lastError: Error | undefined;
 
     try {
@@ -192,6 +194,11 @@ export default class ElectrumNetworkProvider implements NetworkProvider {
     }
 
     if (result instanceof Error) throw result;
+    if (result === undefined) {
+      // Defence in depth: all paths above either assign `result` or throw.
+      // This guards against future refactors that might break that invariant.
+      throw lastError ?? new Error('ElectrumNetworkProvider: request produced no result');
+    }
 
     return result;
   }

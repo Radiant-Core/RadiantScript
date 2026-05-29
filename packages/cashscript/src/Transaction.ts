@@ -21,6 +21,7 @@ import {
   Utxo,
   Output,
   Recipient,
+  SatoshiAmount,
   isSignableUtxo,
   TransactionDetails,
 } from './interfaces.js';
@@ -113,11 +114,11 @@ export class Transaction {
     return this;
   }
 
-  to(to: string, amount: number): this;
+  to(to: string, amount: SatoshiAmount): this;
   to(outputs: Recipient[]): this;
 
-  to(toOrOutputs: string | Recipient[], amount?: number): this {
-    if (typeof toOrOutputs === 'string' && typeof amount === 'number') {
+  to(toOrOutputs: string | Recipient[], amount?: SatoshiAmount): this {
+    if (typeof toOrOutputs === 'string' && (typeof amount === 'number' || typeof amount === 'bigint')) {
       return this.to([{ to: toOrOutputs, amount }]);
     }
 
@@ -221,7 +222,7 @@ export class Transaction {
         ? addressToLockScript(output.to)
         : output.to;
 
-      const satoshis = bigIntToBinUint64LE(BigInt(output.amount));
+      const satoshis = bigIntToBinUint64LE(toBigSat(output.amount));
 
       return { lockingBytecode, satoshis };
     });
@@ -386,17 +387,24 @@ export class Transaction {
     // Add one extra byte per input to over-estimate tx-in count
     const inputSize = getInputSize(placeholderScript) + 1;
 
-    // Calculate amount to send and base fee (excluding additional fees per UTXO)
-    const amount = this.outputs.reduce((acc, output) => acc + output.amount, 0);
+    // Output amounts may be number or bigint; do all amount-vs-amount math in
+    // bigint so we don't lose precision for values above Number.MAX_SAFE_INTEGER.
+    // Fees and sizes stay in number — they're bounded by MAX_FEE_SATOSHIS
+    // (<=10^6) and MAX_TRANSACTION_SIZE (<=10^5) and never approach 2^53.
+    // Validate every output's amount before summing so a malformed value
+    // surfaces here rather than as a downstream BigInt() throw.
+    this.outputs.forEach((output) => this.validateAmount(output.amount));
+    const amount = this.outputs.reduce<bigint>((acc, output) => acc + toBigSat(output.amount), 0n);
     let fee = this.hardcodedFee ?? getTxSizeWithoutInputs(this.outputs) * this.feePerByte;
 
-    // Select and gather UTXOs and calculate fees and available funds
-    let satsAvailable = 0;
+    // Select and gather UTXOs and calculate fees and available funds.
+    // satsAvailable is also tracked in bigint to stay comparable to `amount`.
+    let satsAvailable = 0n;
     if (this.inputs.length > 0) {
       // If inputs are already defined, the user provided the UTXOs
       // and we perform no further UTXO selection
       if (!this.hardcodedFee) fee += this.inputs.length * inputSize * this.feePerByte;
-      satsAvailable = this.inputs.reduce((acc, input) => acc + input.satoshis, 0);
+      satsAvailable = this.inputs.reduce<bigint>((acc, input) => acc + BigInt(input.satoshis), 0n);
     } else {
       // If inputs are not defined yet, we retrieve the contract's UTXOs and perform selection
       const utxos = await this.provider.getUtxos(this.address);
@@ -407,46 +415,69 @@ export class Transaction {
 
       for (const utxo of utxos) {
         this.inputs.push(utxo);
-        satsAvailable += utxo.satoshis;
+        satsAvailable += BigInt(utxo.satoshis);
         if (!this.hardcodedFee) fee += inputSize * this.feePerByte;
-        if (satsAvailable > amount + fee) break;
+        if (satsAvailable > amount + BigInt(Math.ceil(fee))) break;
       }
     }
 
     // Fee per byte can be a decimal number, but we need the total fee to be an integer
-    fee = Math.ceil(fee);
+    const feeBig = BigInt(Math.ceil(fee));
 
     // Calculate change and check available funds
-    let change = satsAvailable - amount - fee;
+    let change = satsAvailable - amount - feeBig;
 
-    if (change < 0) {
-      throw new Error(`Insufficient funds: available (${satsAvailable}) < needed (${amount + fee}).`);
+    if (change < 0n) {
+      throw new Error(`Insufficient funds: available (${satsAvailable}) < needed (${amount + feeBig}).`);
     }
 
     // Account for the fee of a change output
     if (!this.hardcodedFee) {
-      change -= P2SH_OUTPUT_SIZE;
+      change -= BigInt(P2SH_OUTPUT_SIZE);
     }
 
     // Add a change output if applicable
-    if (change >= DUST_LIMIT && change >= this.minChange) {
+    if (change >= BigInt(DUST_LIMIT) && change >= BigInt(this.minChange)) {
       this.outputs.push({ to: this.address, amount: change });
     }
   }
 
   /**
    * Validates that an amount is within safe bounds for transaction outputs.
-   * Prevents integer overflow and negative amount issues.
+   * Prevents integer overflow and negative amount issues. Accepts either
+   * a number (must be a safe integer) or a bigint (must fit in uint64).
    */
-  private validateAmount(amount: number): void {
-    if (amount < 0) {
-      throw new Error(`Amount cannot be negative: ${amount}`);
+  private validateAmount(amount: SatoshiAmount): void {
+    if (typeof amount === 'number') {
+      if (!Number.isInteger(amount)) {
+        throw new Error(`Amount must be an integer: got ${amount}`);
+      }
+      if (amount < 0) {
+        throw new Error(`Amount cannot be negative: ${amount}`);
+      }
+      if (amount > Number.MAX_SAFE_INTEGER) {
+        throw new Error(
+          `Amount ${amount} exceeds Number.MAX_SAFE_INTEGER; pass as bigint to retain precision`,
+        );
+      }
+      return;
     }
-    if (amount > Number.MAX_SAFE_INTEGER) {
-      throw new Error(`Amount ${amount} exceeds maximum safe integer (${Number.MAX_SAFE_INTEGER})`);
+
+    // bigint branch
+    if (amount < 0n) {
+      throw new Error(`Amount cannot be negative: ${amount}n`);
     }
-    if (BigInt(amount) > MAX_SAFE_SATOSHIS) {
-      throw new Error(`Amount ${amount} exceeds maximum safe satoshi value`);
+    if (amount > MAX_SAFE_SATOSHIS) {
+      throw new Error(`Amount ${amount}n exceeds maximum uint64 satoshi value`);
     }
   }
+}
+
+/**
+ * Convert any `SatoshiAmount` (number | bigint) to a bigint for arithmetic
+ * or uint64 encoding. The caller is responsible for having validated the
+ * value first; this helper does not range-check.
+ */
+function toBigSat(amount: SatoshiAmount): bigint {
+  return typeof amount === 'bigint' ? amount : BigInt(amount);
 }

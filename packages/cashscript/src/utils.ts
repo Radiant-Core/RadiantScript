@@ -46,8 +46,18 @@ const sha256Adapter = { hash: (input: Uint8Array): Uint8Array => sha256(input) }
 
 // ////////// PARAMETER VALIDATION ////////////////////////////////////////////
 export function validateRecipient(recipient: Recipient): void {
-  if (recipient.amount < DUST_LIMIT) {
-    throw new OutputSatoshisTooSmallError(recipient.amount);
+  // `amount` may be a number or a bigint; compare in bigint space so the
+  // dust check works for both. DUST_LIMIT is a small constant, lossless to
+  // promote.
+  const amountBig = typeof recipient.amount === 'bigint'
+    ? recipient.amount
+    : BigInt(recipient.amount);
+  if (amountBig < BigInt(DUST_LIMIT)) {
+    // Reporters typically expect a number; format the bigint as Number for
+    // small values and as the raw bigint string for huge ones.
+    throw new OutputSatoshisTooSmallError(
+      amountBig <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(amountBig) : (amountBig as unknown as number),
+    );
   }
 
   // Reject malformed addresses early so the caller sees a descriptive error

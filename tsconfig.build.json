@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
-    "target": "es2015",
+    // BigInt literals (`0n`) and Number.isInteger semantics are used by the
+    // SDK's amount-handling code. Both are available from ES2020 on. Node
+    // 14+ and all evergreen browsers support this; CI tests Node 20/22.
+    "target": "es2020",
     "declaration": true,
     "lib": ["es2020", "dom"],
     "types": ["node", "jest"],

@@ -15,14 +15,22 @@ export function isSignableUtxo(utxo: Utxo): utxo is SignableUtxo {
   return 'template' in utxo;
 }
 
+/**
+ * Satoshi values. `number` is convenient (and lossless up to
+ * `Number.MAX_SAFE_INTEGER` ≈ 9 × 10^15 sat), `bigint` is required to express
+ * the full protocol range up to 2^64 − 1. The SDK accepts either and
+ * normalises to bigint internally before any uint64-encoding.
+ */
+export type SatoshiAmount = number | bigint;
+
 export interface Recipient {
   to: string;
-  amount: number;
+  amount: SatoshiAmount;
 }
 
 export interface Output {
   to: string | Uint8Array;
-  amount: number;
+  amount: SatoshiAmount;
 }
 
 export enum SignatureAlgorithm {

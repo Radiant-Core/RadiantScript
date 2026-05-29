@@ -65,3 +65,63 @@ describe('Transaction polling controls', () => {
     ).rejects.toThrow('Could not retrieve transaction details');
   }, 5_000);
 });
+
+describe('Transaction.validateAmount (SatoshiAmount widening)', () => {
+  // Reuse the polling-test plumbing — we only need a Transaction instance
+  // whose private validateAmount we can call.
+  const stubProvider = {
+    network: Network.MAINNET,
+    getUtxos: async (): Promise<Utxo[]> => [],
+    getBlockHeight: async (): Promise<number> => 0,
+    getRawTransaction: async (): Promise<string> => '',
+    sendRawTransaction: async (): Promise<string> => '',
+  } as const;
+
+  function makeTx(): Transaction {
+    return new (Transaction as any)(
+      'placeholder-address',
+      stubProvider,
+      [],
+      { type: 'function', name: 'noop', inputs: [] },
+      [],
+      undefined,
+    );
+  }
+
+  const v = (amount: number | bigint): void => (makeTx() as any).validateAmount(amount);
+
+  it('accepts a plain integer number', () => {
+    expect(() => v(1000)).not.toThrow();
+  });
+
+  it('accepts a bigint at the protocol maximum (2^64 − 1)', () => {
+    // Documented as MAX_SAFE_SATOSHIS in constants.ts. This value cannot be
+    // expressed losslessly as a JS number, which is the whole point of the
+    // SatoshiAmount widening.
+    expect(() => v(0xFFFFFFFFFFFFFFFFn)).not.toThrow();
+  });
+
+  it('accepts a bigint above Number.MAX_SAFE_INTEGER', () => {
+    expect(() => v(BigInt(Number.MAX_SAFE_INTEGER) + 1n)).not.toThrow();
+  });
+
+  it('rejects a number that is not an integer', () => {
+    expect(() => v(1.5)).toThrow(/integer/);
+  });
+
+  it('rejects a negative number', () => {
+    expect(() => v(-1)).toThrow(/negative/);
+  });
+
+  it('rejects a negative bigint', () => {
+    expect(() => v(-1n)).toThrow(/negative/);
+  });
+
+  it('rejects a number above Number.MAX_SAFE_INTEGER (forces caller to use bigint)', () => {
+    expect(() => v(Number.MAX_SAFE_INTEGER + 1)).toThrow(/bigint/);
+  });
+
+  it('rejects a bigint above 2^64 − 1', () => {
+    expect(() => v(0xFFFFFFFFFFFFFFFFn + 1n)).toThrow(/uint64/);
+  });
+});

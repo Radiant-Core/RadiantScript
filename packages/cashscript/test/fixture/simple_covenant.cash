@@ -1,5 +1,0 @@
-contract Covenant() {
-    function spend() {
-        require(tx.version >= 2);
-    }
-}

@@ -87,26 +87,8 @@ describe('Contract', () => {
     });
   });
 
-  describe('getBalance', () => {
-    // Not very robust, as this depends on the example P2PKH contract having balance
-    it('should return balance for existing contract', async () => {
-      // eslint-disable-next-line global-require
-      const artifact = require('./fixture/p2pkh.json');
-      const provider = new ElectrumNetworkProvider();
-      const instance = new Contract(artifact, [alicePkh], provider);
-
-      expect(await instance.getBalance()).toBeGreaterThan(0);
-    });
-
-    it('should return zero balance for new contract', async () => {
-      // eslint-disable-next-line global-require
-      const artifact = require('./fixture/p2pkh.json');
-      const provider = new ElectrumNetworkProvider();
-      const instance = new Contract(artifact, [placeholder(20)], provider);
-
-      expect(await instance.getBalance()).toBe(0);
-    });
-  });
+  // NOTE: getBalance tests moved to test/e2e/Contract.balance.e2e.test.ts —
+  // both hit a live Radiant ElectrumX endpoint and depend on real funds.
 
   describe('Contract functions', () => {
     let instance: Contract;

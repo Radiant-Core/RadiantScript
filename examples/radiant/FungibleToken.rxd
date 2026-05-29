@@ -12,57 +12,75 @@ pragma radiantscript ^1.1.0;
 // UTXO state layout: <20-byte pkh> OP_STATESEPARATOR <code script>
 //
 // Usage:
-//   1. Mint: create a UTXO with this code script and pkh of first holder in state
-//   2. Transfer: spend with holder's signature; set new pkh in output[0] state
-//   3. Burn: spend with holder's signature; reduce output token sum by burnAmount
+//   1. Mint: create a UTXO with this code script and the first holder's
+//      pkh in the state section.
+//   2. Transfer: spend with the holder's signature; set the new holder's
+//      pkh in every output that carries $tokenRef. The contract enforces
+//      that every such output also uses this FungibleToken code script,
+//      so the token cannot escape into a non-FungibleToken script.
+//   3. Burn: same constraints as Transfer, plus an explicit burnAmount.
 
 contract FungibleToken(
     bytes36 constant $tokenRef   // The unique token reference (txid:vout)
 ) {
-    // Transfer tokens to new holder.
-    // The spender provides their pubkey; the contract verifies it matches
-    // the pkh embedded in this UTXO's state section.
-    // output[0] must be another FungibleToken UTXO with the same code script.
-    function transfer(pubkey senderPk, sig s) {
-        // Verify sender's signature
-        require(checkSig(s, senderPk));
+    return {
+        // Transfer tokens to new holder(s).
+        // The spender proves ownership by signing with the key whose pkh is
+        // embedded in this UTXO's state.
+        transfer(pubkey senderPk, sig s) {
+            // Verify sender's signature
+            require(checkSig(s, senderPk));
 
-        // Verify senderPk matches the pkh stored in this UTXO's state section
-        bytes20 embeddedPkh = bytes20(tx.inputs[this.activeInputIndex].stateScript);
-        require(hash160(senderPk) == embeddedPkh);
+            // Verify senderPk matches the pkh stored in this UTXO's state section
+            // State script layout is `0x14 <20-byte pkh>` (a single direct
+            // push of the holder's pkh). Strip the leading 1-byte push
+            // opcode before comparing.
+            bytes20 embeddedPkh = bytes20(tx.inputs[this.activeInputIndex].stateScript.split(1)[1]);
+            require(hash160(senderPk) == embeddedPkh);
 
-        // Track the token reference
-        pushInputRef($tokenRef);
+            // Track the token reference
+            pushInputRef($tokenRef);
 
-        // Enforce conservation: total token value is preserved
-        int inputTokens = tx.inputs.refValueSum($tokenRef);
-        int outputTokens = tx.outputs.refValueSum($tokenRef);
-        require(inputTokens == outputTokens);
+            // Hash this UTXO's code script so we can ask Radiant's
+            // introspection ops about it across outputs.
+            bytes32 csh = hash256(tx.inputs[this.activeInputIndex].codeScript);
 
-        // Enforce that the output carries the same code script (preserves contract logic)
-        bytes inputCode = tx.inputs[this.activeInputIndex].codeScript;
-        require(tx.outputs[0].codeScript == inputCode);
-    }
+            // Every output carrying $tokenRef MUST also have this code script.
+            // Without this check, a holder could split the token into an
+            // output whose script does not enforce FungibleToken's rules —
+            // refValueSum conservation alone is satisfied by such a split.
+            require(tx.outputs.codeScriptCount(csh) == tx.outputs.refOutputCount($tokenRef));
 
-    // Burn tokens (intentionally reduce supply).
-    // burnAmount must be > 0 and <= inputTokens to prevent underflow ambiguity.
-    function burn(pubkey senderPk, sig s, int burnAmount) {
-        require(checkSig(s, senderPk));
+            // Enforce token-value conservation across the constrained outputs.
+            require(tx.inputs.codeScriptValueSum(csh) == tx.outputs.codeScriptValueSum(csh));
+        },
 
-        // Verify senderPk matches the pkh stored in this UTXO's state section
-        bytes20 embeddedPkh = bytes20(tx.inputs[this.activeInputIndex].stateScript);
-        require(hash160(senderPk) == embeddedPkh);
+        // Burn tokens (intentionally reduce supply). The same all-outputs
+        // constraint as transfer() applies, so any remainder must stay
+        // inside the FungibleToken script.
+        burn(pubkey senderPk, sig s, int burnAmount) {
+            require(checkSig(s, senderPk));
 
-        pushInputRef($tokenRef);
+            // State script layout is `0x14 <20-byte pkh>` (a single direct
+            // push of the holder's pkh). Strip the leading 1-byte push
+            // opcode before comparing.
+            bytes20 embeddedPkh = bytes20(tx.inputs[this.activeInputIndex].stateScript.split(1)[1]);
+            require(hash160(senderPk) == embeddedPkh);
 
-        int inputTokens = tx.inputs.refValueSum($tokenRef);
-        int outputTokens = tx.outputs.refValueSum($tokenRef);
+            pushInputRef($tokenRef);
 
-        // Bound burnAmount: must be positive and cannot exceed what is available
-        require(burnAmount > 0);
-        require(burnAmount <= inputTokens);
+            bytes32 csh = hash256(tx.inputs[this.activeInputIndex].codeScript);
+            require(tx.outputs.codeScriptCount(csh) == tx.outputs.refOutputCount($tokenRef));
 
-        // Output tokens should be less by exactly burnAmount
-        require(inputTokens - burnAmount == outputTokens);
+            int inputTokens = tx.inputs.codeScriptValueSum(csh);
+            int outputTokens = tx.outputs.codeScriptValueSum(csh);
+
+            // burnAmount must be positive and cannot exceed what is available.
+            require(burnAmount > 0);
+            require(burnAmount <= inputTokens);
+
+            // Output tokens should be less by exactly burnAmount.
+            require(inputTokens - burnAmount == outputTokens);
+        }
     }
 }

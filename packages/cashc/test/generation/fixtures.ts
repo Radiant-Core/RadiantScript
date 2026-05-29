@@ -135,7 +135,7 @@ export const fixtures: Fixture[] = [
       ],
       asm:
         // require(checkMultiSig([s1, s2], [pk1, pk2, pk3]))
-        'OP_0 OP_ROT OP_ROT OP_2 $pk1 $pk2 $pk3 OP_3 OP_CHECKMULTISIG'
+        'OP_0 OP_ROT OP_ROT OP_2 $pk1 $pk2 $pk3 OP_3 OP_CHECKMULTISIG',
     },
   },
   {

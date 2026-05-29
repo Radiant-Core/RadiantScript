@@ -1,7 +1,12 @@
 module.exports = {
   root: true,
   parser: '@typescript-eslint/parser',
-  plugins: ['@typescript-eslint'],
+  // `import` is added explicitly so eslint-plugin-import's rules
+  // (e.g. import/extensions, used by airbnb-typescript/base) resolve from
+  // every package's lint script, not just root. Without it, per-package
+  // `prepublishOnly` lint runs fail with "Definition for rule 'import/...'
+  // was not found".
+  plugins: ['@typescript-eslint', 'import'],
   extends: ['airbnb-typescript/base'],
   parserOptions: {
     project: './tsconfig.json',

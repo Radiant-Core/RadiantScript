@@ -253,6 +253,7 @@ export function scriptToAddress(script: Script, network: string): string {
  * longer required — P2SH locking scripts are network-agnostic; only the
  * encoded *address* (see `scriptToAddress`) depends on the network.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function scriptToLockingBytecode(script: Script, _network: string = Network.MAINNET): Uint8Array {
   const scriptHash = hash160(scriptToBytecode(script));
   return new Uint8Array([

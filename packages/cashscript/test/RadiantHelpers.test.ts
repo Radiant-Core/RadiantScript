@@ -136,10 +136,7 @@ describe('buildStatefulOutput + splitStatefulBytecode round-trip', () => {
 
   it('inserts OP_STATESEPARATOR between state and code', () => {
     const output = buildStatefulOutput(stateData, codeScript);
-    const sepIdx = Array.from(output).findIndex((b, i) => {
-      if (b !== OP_STATESEPARATOR) return false;
-      return true;
-    });
+    const sepIdx = Array.from(output).findIndex((b) => b === OP_STATESEPARATOR);
     expect(sepIdx).toBeGreaterThan(0);
     expect(output[sepIdx]).toBe(OP_STATESEPARATOR);
   });

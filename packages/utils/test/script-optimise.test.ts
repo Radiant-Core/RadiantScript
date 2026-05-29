@@ -365,7 +365,7 @@ function stacksEqual(a: StackItem[], b: StackItem[]): boolean {
 // ----------------------------------------------------------------------
 
 // Deterministic PRNG so failures reproduce.
-function mulberry32(seed: number) {
+function mulberry32(seed: number): () => number {
   let s = seed >>> 0;
   return () => {
     s = (s + 0x6D2B79F5) >>> 0;

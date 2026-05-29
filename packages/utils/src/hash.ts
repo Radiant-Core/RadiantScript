@@ -15,9 +15,14 @@
 // @noble/hashes v1 ships dual CJS + ESM (v2 is ESM-only, which jest's CJS
 // loader cannot consume without an explicit transform). Stay on v1 until the
 // jest pipeline is moved off CJS.
+// eslint-disable rule isn't fixable without breaking runtime resolution:
+// noble v1 exposes subpaths as `./sha256`, no `.js` suffix, so adding one
+// would 404 at import time despite making airbnb's import/extensions happy.
+/* eslint-disable import/extensions */
 import { sha256 as nobleSha256 } from '@noble/hashes/sha256';
 import { sha512 as nobleSha512 } from '@noble/hashes/sha512';
 import { ripemd160 as nobleRipemd160 } from '@noble/hashes/ripemd160';
+/* eslint-enable import/extensions */
 
 export function sha512(payload: Uint8Array): Uint8Array {
   return nobleSha512(payload);

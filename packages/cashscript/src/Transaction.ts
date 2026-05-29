@@ -335,11 +335,14 @@ export class Transaction {
     signal?: AbortSignal,
     maxRetries: number = 1200,
   ): Promise<TransactionDetails | string> {
+    const sleep = (ms: number): Promise<void> => new Promise<void>((resolve) => {
+      setTimeout(resolve, ms);
+    });
     for (let retries = 0; retries < maxRetries; retries += 1) {
       if (signal?.aborted) {
         throw new Error('getTxDetails aborted by caller');
       }
-      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+      await sleep(500);
       try {
         const hex = await this.provider.getRawTransaction(txid);
 

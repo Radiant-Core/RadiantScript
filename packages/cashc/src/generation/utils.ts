@@ -101,8 +101,12 @@ export function compileBinaryOp(op: BinaryOperator, numeric: boolean = false): S
 
   if (numeric) {
     mapping[BinaryOperator.PLUS] = [Op.OP_ADD];
-    mapping[BinaryOperator.MUL] = [Op.OP_2MUL];
-    mapping[BinaryOperator.DIV] = [Op.OP_2DIV];
+    // OP_MUL / OP_DIV are full binary multiply/divide (re-enabled in Radiant
+    // consensus). OP_2MUL / OP_2DIV are UNARY multiply/divide-by-2 and must NOT
+    // be used for the binary `*` / `/` operators — doing so silently computes
+    // `x * 2` / `x / 2` and (being unary) corrupts the compiler's stack model.
+    mapping[BinaryOperator.MUL] = [Op.OP_MUL];
+    mapping[BinaryOperator.DIV] = [Op.OP_DIV];
     mapping[BinaryOperator.EQ] = [Op.OP_NUMEQUAL];
     mapping[BinaryOperator.NE] = [Op.OP_NUMNOTEQUAL];
   }

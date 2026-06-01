@@ -153,9 +153,10 @@ export const fixtures: Fixture[] = [
       asm:
         '$_b '
         // bytes x = b.split(b.length / 2)[1]
-        // Post V2-fork: the compiler emits OP_2DIV instead of OP_DIV-by-2 as
-        // an optimisation, matching the new opcode added in commit ac69ad2.
-        + 'OP_DUP OP_DUP OP_SIZE OP_NIP OP_2 OP_2DIV OP_SPLIT OP_NIP '
+        // `b.length / 2` is binary division and must lower to OP_DIV. (The unary
+        // OP_2DIV would halve the pushed literal 2, not the length — see the
+        // OP_MUL/OP_DIV fix in generation/utils.ts compileBinaryOp.)
+        + 'OP_DUP OP_DUP OP_SIZE OP_NIP OP_2 OP_DIV OP_SPLIT OP_NIP '
         // require(x != b)
         + 'OP_2DUP OP_EQUAL OP_NOT OP_VERIFY '
         // bytes x = b.split(b.length / 2)[1]

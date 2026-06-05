@@ -1,57 +1,78 @@
 pragma radiantscript ^1.1.0;
 
-// MultiSigVault - Multi-signature vault with Radiant introspection
-// Demonstrates 2-of-3 multisig with output verification
+// AUDIT: 2-of-3 multisig vault. spendWithMinOutput now pins output[0] to a FIXED
+// recipient P2PKH (recipientPkh, a constructor constant) and a minimum value, and
+// requires change (output[1], when present) to return to the vault's own script —
+// so a quorum can no longer redirect funds to an arbitrary address. emergencyRecover
+// is timelocked to any single key. Residual limitations below.
 //
-// Features:
-// - 2-of-3 multi-signature requirement
-// - Output amount verification using introspection
-// - Dust threshold enforcement
+// MultiSigVault - Multi-signature vault with Radiant introspection.
 //
-// Usage:
-//   1. Lock funds with 3 public keys
-//   2. Spend requires 2 valid signatures
-//   3. Can enforce minimum output amounts
+// Security model:
+// - spend(): plain 2-of-3, no output constraints (use only when the signers
+//   fully trust the transaction they co-sign).
+// - spendWithMinOutput(): 2-of-3 AND output[0] must be a P2PKH to the
+//   constructor-fixed recipientPkh with value >= minAmount (and >= dust). Any
+//   change output[1] must return to the vault's own locking script. This binds
+//   WHERE the money goes, not just how much — the gap the previous template had.
+// - emergencyRecover(): after a ~1 year timelock, any one of the three keys can
+//   recover unilaterally.
+//
+// recipientPkh and minAmount are constructor constants, fixed at vault creation.
+// Making them function arguments would let a quorum pass an arbitrary recipient
+// or minAmount = 0, defeating the constraint.
+//
+// LIMITATION:
+//   - The recipient is FIXED at construction. This vault pays exactly one
+//     destination; it is a "pay this party, with change back to us" vault, not a
+//     general spend-anywhere multisig. A general vault cannot bind the recipient
+//     without passing it as a (spoofable) argument.
+//   - The change check on output[1] is guarded by `if (length >= 2)`. If the
+//     spend produces NO change output, no change constraint applies; the recipient
+//     pin on output[0] still holds unconditionally. Builders that add change MUST
+//     place it at output[1] in the vault's own script.
+//   - Only output[0] (recipient) and output[1] (change) are constrained; extra
+//     outputs beyond index 1 are NOT bound by this template.
 
 contract MultiSigVault(
     pubkey pk1,
     pubkey pk2,
     pubkey pk3,
-    // minAmount is a constructor constant — fixed at contract creation time.
-    // Making this a function argument would allow signers to pass 0, bypassing the check.
-    int constant minAmount
+    bytes20 constant recipientPkh,  // Fixed payout recipient (pkh), set at creation
+    int constant minAmount          // Fixed minimum payout, set at creation
 ) {
-    // Standard 2-of-3 multisig spend
-    function spend(sig s1, sig s2) {
-        require(checkMultiSig([s1, s2], [pk1, pk2, pk3]));
-    }
+    return {
+        // Plain 2-of-3 multisig spend (no output constraints).
+        spend(sig s1, sig s2) {
+            require(checkMultiSig([s1, s2], [pk1, pk2, pk3]));
+        },
 
-    // Spend with output verification
-    // Ensures output[0] receives at least minAmount and no output is below dust (546 sats).
-    // Output count is unrolled up to 3 — Radiant script does not support dynamic loops.
-    function spendWithMinOutput(sig s1, sig s2) {
-        require(checkMultiSig([s1, s2], [pk1, pk2, pk3]));
+        // 2-of-3 spend that pins the recipient and returns change to the vault.
+        spendWithMinOutput(sig s1, sig s2) {
+            require(checkMultiSig([s1, s2], [pk1, pk2, pk3]));
 
-        // Enforce the minimum required output to the primary recipient
-        require(tx.outputs[0].value >= minAmount);
+            // Change (output[1], when present) must return to the vault's own
+            // locking script, so a quorum cannot skim change to an outside script.
+            bytes myLock = tx.inputs[this.activeInputIndex].lockingBytecode;
+            int numOutputs = tx.outputs.length;
+            if (numOutputs >= 2) {
+                require(tx.outputs[1].lockingBytecode == myLock);
+                require(tx.outputs[1].value >= 546);
+            }
 
-        // Anti-dust: check the first 3 outputs if they exist
-        int numOutputs = tx.outputs.length;
-        if (numOutputs >= 1) {
+            // output[0] must pay the fixed recipient P2PKH, at least minAmount,
+            // and at least dust. These run unconditionally.
+            bytes25 recipientLock = new LockingBytecodeP2PKH(recipientPkh);
+            require(tx.outputs[0].lockingBytecode == recipientLock);
+            require(tx.outputs[0].value >= minAmount);
             require(tx.outputs[0].value >= 546);
+        },
+
+        // Emergency recovery by any single key after a timelock (~1 year).
+        emergencyRecover(sig s, pubkey pk) {
+            require(tx.age >= 52560);  // ~1 year in blocks
+            require(pk == pk1 || pk == pk2 || pk == pk3);
+            require(checkSig(s, pk));
         }
-        if (numOutputs >= 2) {
-            require(tx.outputs[1].value >= 546);
-        }
-        if (numOutputs >= 3) {
-            require(tx.outputs[2].value >= 546);
-        }
-    }
-    
-    // Emergency recovery by any single key after timelock
-    function emergencyRecover(sig s, pubkey pk) {
-        require(tx.age >= 52560);  // ~1 year in blocks
-        require(pk == pk1 || pk == pk2 || pk == pk3);
-        require(checkSig(s, pk));
     }
 }

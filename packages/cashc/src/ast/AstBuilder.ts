@@ -86,7 +86,7 @@ import {
 } from './Globals.js';
 import { getPragmaName, PragmaName, getVersionOpFromCtx } from './Pragma.js';
 import { version } from '../index.js';
-import { ParseError, VersionError } from '../Errors.js';
+import { IntLiteralOverflowError, ParseError, VersionError } from '../Errors.js';
 
 export default class AstBuilder
   extends AbstractParseTreeVisitor<Node>
@@ -377,8 +377,17 @@ export default class AstBuilder
     const numberCtx = ctx.numberLiteral() as NumberLiteralContext;
     const numberString = numberCtx.NumberLiteral().text;
     const numberUnit = numberCtx.NumberUnit();
-    let numberValue = parseInt(numberString, 10);
-    numberValue *= numberUnit ? NumberUnit[numberUnit.text.toUpperCase()] : 1;
+    // Parse with BigInt to preserve exact integer values (parseInt uses a lossy
+    // JS double, silently rounding values beyond 2^53).
+    const unit = BigInt(numberUnit ? NumberUnit[numberUnit.text.toUpperCase()] : 1);
+    const numberValue = BigInt(numberString) * unit;
+
+    // Script numbers are signed and bounded to 8 bytes: abs value <= 2^63 - 1.
+    const MAX_SCRIPT_NUMBER = 2n ** 63n - 1n;
+    if (numberValue < -MAX_SCRIPT_NUMBER || numberValue > MAX_SCRIPT_NUMBER) {
+      throw new IntLiteralOverflowError(numberValue, Location.fromCtx(ctx));
+    }
+
     const intLiteral = new IntLiteralNode(numberValue);
     intLiteral.location = Location.fromCtx(ctx);
     return intLiteral;

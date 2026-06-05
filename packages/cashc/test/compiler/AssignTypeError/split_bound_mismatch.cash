@@ -1,0 +1,13 @@
+pragma radiantscript ^1.0.0;
+
+// Regression test for L-1: splitting a bytes32 at index 16 yields two 16-byte
+// halves. Declaring the second half as bytes32 is a lie about its width and must
+// be rejected, rather than slipping through the bytes->bytes escape hatch.
+contract Test() {
+    return {
+        split(bytes32 data) {
+            bytes16 a, bytes32 b = data.split(16);
+            require(a == b);
+        }
+    }
+}

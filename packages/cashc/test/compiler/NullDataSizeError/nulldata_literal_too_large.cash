@@ -1,0 +1,15 @@
+pragma radiantscript ^1.0.0;
+
+// Regression test for L-4: a nulldata literal chunk larger than 255 bytes cannot
+// be encoded by the in-script VarInt builder (it only emits the OP_PUSHDATA1
+// single-byte length prefix). It must be rejected at compile time.
+contract Test() {
+    return {
+        announce() {
+            bytes announcement = new LockingBytecodeNullData([
+                0xabababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab
+            ]);
+            require(tx.outputs[0].lockingBytecode == announcement);
+        }
+    }
+}

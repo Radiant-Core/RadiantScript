@@ -8,7 +8,7 @@ import {
 } from 'electrum-cash';
 import { Utxo, Network } from '../interfaces.js';
 import NetworkProvider from './NetworkProvider.js';
-import { addressToLockScript } from '../utils.js';
+import { addressToLockScript, validateUtxo } from '../utils.js';
 
 /**
  * ElectrumNetworkProvider - Network provider for connecting to Electrum/RXinDexer servers
@@ -92,7 +92,8 @@ export default class ElectrumNetworkProvider implements NetworkProvider {
 
     const result = await this.performRequest('blockchain.scripthash.listunspent', scripthash) as ElectrumUtxo[];
 
-    const utxos = result.map((utxo) => ({
+    // Providers are untrusted — validate each UTXO before returning it (M-4).
+    const utxos = result.map((utxo) => validateUtxo({
       txid: utxo.tx_hash,
       vout: utxo.tx_pos,
       satoshis: utxo.value,

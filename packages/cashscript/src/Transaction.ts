@@ -24,6 +24,7 @@ import {
   SatoshiAmount,
   isSignableUtxo,
   TransactionDetails,
+  HashType,
 } from './interfaces.js';
 import {
   meep,
@@ -45,6 +46,7 @@ import {
   MAX_INPUT_COUNT,
   MAX_OUTPUT_COUNT,
   MAX_SAFE_SATOSHIS,
+  MAX_MONEY,
 } from './constants.js';
 import NetworkProvider from './network/NetworkProvider.js';
 import SignatureTemplate from './SignatureTemplate.js';
@@ -66,9 +68,10 @@ export class Transaction {
 
   private sequence = 0xfffffffe;
   private locktime: number;
-  private hardcodedFee: number;
+  private hardcodedFee: number | undefined;
   private feePerByte = 1.0;
   private minChange = DUST_LIMIT;
+  private verifyPrevoutsEnabled = true;
 
   constructor(
     private address: string,
@@ -192,6 +195,22 @@ export class Transaction {
     return this.withMinChange(Number.MAX_VALUE);
   }
 
+  /**
+   * Disable the (default-on) prevout verification performed before signing.
+   *
+   * By default `build()` fetches and authenticates each input's source
+   * transaction (`hash256(rawtx) == txid`) and asserts the prevout's value and
+   * locking script match what is being signed (see {@link verifyPrevouts} /
+   * audit H-2). Disable this ONLY for offline signing or tests where source
+   * transactions cannot be retrieved — skipping it re-opens the risk of a
+   * malicious or buggy provider making you sign over a wrong input amount, or a
+   * UTXO whose script you do not actually control.
+   */
+  withoutPrevoutVerification(): this {
+    this.verifyPrevoutsEnabled = false;
+    return this;
+  }
+
   async build(): Promise<string> {
     this.locktime = this.locktime ?? await this.provider.getBlockHeight();
     await this.setInputsAndOutputs();
@@ -205,6 +224,15 @@ export class Transaction {
     }
 
     const secp256k1 = await instantiateSecp256k1();
+
+    // H-2 (full): authenticate every input's prevout (value + locking script)
+    // against its source transaction BEFORE signing, so a malicious/buggy
+    // provider cannot make us sign over a wrong amount or a script we do not
+    // control. Default-on; opt out with .withoutPrevoutVerification().
+    if (this.verifyPrevoutsEnabled) {
+      await this.verifyPrevouts(secp256k1);
+    }
+
     const bytecode = scriptToBytecode(this.redeemScript);
 
     const inputs = this.inputs.map((utxo) => ({
@@ -246,6 +274,7 @@ export class Transaction {
         const prevOutScript = addressContentsToLockingBytecode(addressContents);
 
         const hashtype = utxo.template.getHashType();
+        this.assertSingleHasOutput(hashtype, i);
         const preimage = createSighashPreimage(transaction, utxo, i, prevOutScript, hashtype);
         const sighash = hash256(preimage);
 
@@ -261,10 +290,21 @@ export class Transaction {
       const completeArgs = this.args.map((arg) => {
         if (!(arg instanceof SignatureTemplate)) return arg;
 
-        // First signature is used for sighash preimage (maybe not the best way)
-        if (covenantHashType < 0) covenantHashType = arg.getHashType();
+        const argHashType = arg.getHashType();
 
-        const preimage = createSighashPreimage(transaction, utxo, i, bytecode, arg.getHashType());
+        // First signature is used for sighash preimage (maybe not the best way)
+        if (covenantHashType < 0) {
+          covenantHashType = argHashType;
+        } else if (covenantHashType !== argHashType) {
+          // L-2: the on-stack preimage is built from the first signature's hash
+          // type only, so all covenant signatures must agree on it — otherwise
+          // the later signatures would be verified against the wrong preimage.
+          throw new Error('All covenant signatures must use the same hash type');
+        }
+
+        this.assertSingleHasOutput(argHashType, i);
+
+        const preimage = createSighashPreimage(transaction, utxo, i, bytecode, argHashType);
         const sighash = hash256(preimage);
 
         return arg.generateSignature(sighash, secp256k1);
@@ -343,16 +383,28 @@ export class Transaction {
         throw new Error('getTxDetails aborted by caller');
       }
       await sleep(500);
+      let hex: string;
       try {
-        const hex = await this.provider.getRawTransaction(txid);
-
-        if (raw) return hex;
-
-        const libauthTransaction = decodeTransaction(hexToBin(hex)) as LibauthTransaction;
-        return { ...libauthTransaction, txid, hex };
+        hex = await this.provider.getRawTransaction(txid);
       } catch (ignored) {
-        // ignored
+        // tx not yet visible on the network — keep polling.
+        continue;
       }
+
+      // H-3: don't trust the server's hex blindly — verify it hashes to the
+      // txid we asked for before re-stamping it. A mismatch means the provider
+      // returned the wrong transaction, so surface it rather than swallow-and-
+      // retry.
+      const bytes = hexToBin(hex);
+      const computed = this.computeDisplayTxid(bytes);
+      if (computed !== txid) {
+        throw new Error(`Provider returned tx ${computed} for requested ${txid}`);
+      }
+
+      if (raw) return hex;
+
+      const libauthTransaction = decodeTransaction(bytes) as LibauthTransaction;
+      return { ...libauthTransaction, txid, hex };
     }
 
     throw new Error('Could not retrieve transaction details for over 10 minutes');
@@ -398,15 +450,29 @@ export class Transaction {
     // surfaces here rather than as a downstream BigInt() throw.
     this.outputs.forEach((output) => this.validateAmount(output.amount));
     const amount = this.outputs.reduce<bigint>((acc, output) => acc + toBigSat(output.amount), 0n);
-    let fee = this.hardcodedFee ?? getTxSizeWithoutInputs(this.outputs) * this.feePerByte;
+
+    // An explicit `withHardcodedFee(0)` is a legitimate request for a zero fee
+    // — distinguish "set to 0" from "unset" so a hardcoded zero is honoured
+    // exactly (no per-input fees or change-output deduction sneak back in).
+    const useHardcodedFee = this.hardcodedFee !== undefined;
+    let fee = useHardcodedFee
+      ? this.hardcodedFee!
+      : getTxSizeWithoutInputs(this.outputs) * this.feePerByte;
 
     // Select and gather UTXOs and calculate fees and available funds.
     // satsAvailable is also tracked in bigint to stay comparable to `amount`.
+    // NOTE (H-2): input satoshis ultimately flow unverified into the sighash
+    // preimage (see utils.ts createSighashPreimage). We range-validate every
+    // input's satoshis here the same way outputs are validated, but full safety
+    // requires verifying each input's prevout value+script against the source
+    // transaction — out of scope for this fix as it would change the provider
+    // contract (a prevout fetch). See H-2.
     let satsAvailable = 0n;
     if (this.inputs.length > 0) {
       // If inputs are already defined, the user provided the UTXOs
       // and we perform no further UTXO selection
-      if (!this.hardcodedFee) fee += this.inputs.length * inputSize * this.feePerByte;
+      this.inputs.forEach((input) => this.validateAmount(input.satoshis));
+      if (!useHardcodedFee) fee += this.inputs.length * inputSize * this.feePerByte;
       satsAvailable = this.inputs.reduce<bigint>((acc, input) => acc + BigInt(input.satoshis), 0n);
     } else {
       // If inputs are not defined yet, we retrieve the contract's UTXOs and perform selection
@@ -417,9 +483,10 @@ export class Transaction {
       utxos.sort((a, b) => b.satoshis - a.satoshis);
 
       for (const utxo of utxos) {
+        this.validateAmount(utxo.satoshis);
         this.inputs.push(utxo);
         satsAvailable += BigInt(utxo.satoshis);
-        if (!this.hardcodedFee) fee += inputSize * this.feePerByte;
+        if (!useHardcodedFee) fee += inputSize * this.feePerByte;
         if (satsAvailable > amount + BigInt(Math.ceil(fee))) break;
       }
     }
@@ -434,14 +501,169 @@ export class Transaction {
       throw new Error(`Insufficient funds: available (${satsAvailable}) < needed (${amount + feeBig}).`);
     }
 
-    // Account for the fee of a change output
-    if (!this.hardcodedFee) {
-      change -= BigInt(P2SH_OUTPUT_SIZE);
+    // Account for the fee of a change output. Scale by feePerByte so the change
+    // path doesn't underpay when the relay floor forces feePerByte >> 1 (H-4).
+    if (!useHardcodedFee) {
+      change -= BigInt(Math.ceil(P2SH_OUTPUT_SIZE * this.feePerByte));
     }
 
     // Add a change output if applicable
     if (change >= BigInt(DUST_LIMIT) && change >= BigInt(this.minChange)) {
       this.outputs.push({ to: this.address, amount: change });
+    }
+  }
+
+  /**
+   * Radiant/Bitcoin display txid: the byte-reversed `hash256` of the raw
+   * transaction bytes. Shared by `getTxDetails` (H-3) and prevout
+   * authentication (H-2) so both use the identical convention.
+   */
+  // eslint-disable-next-line class-methods-use-this
+  private computeDisplayTxid(rawTxBytes: Uint8Array): string {
+    return binToHex(hash256(rawTxBytes).reverse());
+  }
+
+  /**
+   * Verify every input's prevout against its authenticated source transaction
+   * before signing (audit H-2 — full fix).
+   *
+   * The SDK commits each input's `satoshis` value (and, via the covenant
+   * preimage, the prevout context) into the sighash. A malicious or buggy
+   * network provider that lied about a UTXO's value or script could otherwise
+   * make the caller sign over the wrong input amount (invalid signature /
+   * griefing), or — for a covenant that derives a payout/split from the spent
+   * value (e.g. an AMM or prediction market) — be steered toward an
+   * attacker-favourable result. For each input we:
+   *
+   *  1. fetch its source transaction and re-derive the txid
+   *     (`hash256(rawtx)` reversed). A provider therefore cannot substitute a
+   *     forged source transaction with altered values, because it would no
+   *     longer hash to the outpoint txid the spender already committed to;
+   *  2. assert the referenced output index exists in that transaction;
+   *  3. assert the prevout value equals the `satoshis` we are about to sign;
+   *  4. assert the prevout locking script equals the script we expect to be
+   *     unlocking — the contract's P2SH script for covenant inputs, or the
+   *     P2PKH script of the signing key for `experimentalFromP2PKH` inputs;
+   *  5. range-check the value to Radiant's consensus `[0, MAX_MONEY]`.
+   *
+   * Source transactions are fetched once per unique txid and in parallel.
+   */
+  private async verifyPrevouts(
+    secp256k1: Awaited<ReturnType<typeof instantiateSecp256k1>>,
+  ): Promise<void> {
+    const uniqueTxids = [...new Set(this.inputs.map((utxo) => utxo.txid))];
+
+    // Fetch + authenticate each distinct source transaction exactly once.
+    const sourceTxs = new Map<string, LibauthTransaction>();
+    await Promise.all(uniqueTxids.map(async (txid) => {
+      let hex: string;
+      try {
+        hex = await this.provider.getRawTransaction(txid);
+      } catch (e: any) {
+        throw new Error(
+          `Prevout verification failed: could not fetch source transaction ${txid} `
+          + `(${e?.message ?? e}). Use a provider that serves source transactions, `
+          + 'or call .withoutPrevoutVerification() to skip (unsafe).',
+        );
+      }
+
+      const bytes = hexToBin(hex);
+      const computed = this.computeDisplayTxid(bytes);
+      if (computed !== txid) {
+        throw new Error(
+          `Prevout verification failed: provider returned transaction ${computed} `
+          + `when ${txid} was requested.`,
+        );
+      }
+
+      const decoded = decodeTransaction(bytes);
+      if (typeof decoded === 'string') {
+        throw new Error(`Prevout verification failed: could not decode source transaction ${txid}: ${decoded}`);
+      }
+      sourceTxs.set(txid, decoded);
+    }));
+
+    // For covenant inputs we expect the contract's own P2SH locking script.
+    const contractLockingBytecode = addressToLockScript(this.address);
+
+    this.inputs.forEach((utxo, i) => {
+      // (5) consensus money-range check on the value we are about to commit.
+      this.assertMoneyRange(utxo.satoshis, i);
+
+      const sourceTx = sourceTxs.get(utxo.txid)!;
+
+      // (2) the referenced output index must exist in the source transaction.
+      if (utxo.vout < 0 || utxo.vout >= sourceTx.outputs.length) {
+        throw new Error(
+          `Prevout verification failed: input ${i} spends ${utxo.txid}:${utxo.vout}, `
+          + `but that transaction has only ${sourceTx.outputs.length} output(s).`,
+        );
+      }
+      const prevout = sourceTx.outputs[utxo.vout];
+
+      // (3) the prevout value must equal the satoshis we are about to sign over
+      //     (libauth 1.19 decodes output value as an 8-byte LE Uint8Array).
+      const claimed = bigIntToBinUint64LE(BigInt(utxo.satoshis));
+      if (binToHex(prevout.satoshis) !== binToHex(claimed)) {
+        throw new Error(
+          `Prevout verification failed: input ${i} (${utxo.txid}:${utxo.vout}) is `
+          + `declared as ${utxo.satoshis} sat, but its source output holds `
+          + `${leBytesToBigInt(prevout.satoshis)} sat. Refusing to sign over a `
+          + 'mismatched input amount.',
+        );
+      }
+
+      // (4) the prevout locking script must be the script we expect to unlock.
+      const expectedScript = isSignableUtxo(utxo)
+        ? addressContentsToLockingBytecode({
+          payload: hash160(utxo.template.getPublicKey(secp256k1)),
+          type: AddressType.p2pkh,
+        })
+        : contractLockingBytecode;
+
+      if (binToHex(prevout.lockingBytecode) !== binToHex(expectedScript)) {
+        throw new Error(
+          `Prevout verification failed: input ${i} (${utxo.txid}:${utxo.vout}) has `
+          + `prevout script ${binToHex(prevout.lockingBytecode)}, which does not `
+          + `match the expected ${isSignableUtxo(utxo) ? 'P2PKH (signing key)' : 'contract P2SH'} `
+          + `script ${binToHex(expectedScript)}. This UTXO does not belong to the `
+          + 'address being spent.',
+        );
+      }
+    });
+  }
+
+  /**
+   * Assert a satoshi value is an integer within Radiant's consensus money range
+   * `[0, MAX_MONEY]` (audit H-2). `Utxo.satoshis` is a `number`; reject
+   * non-integer / negative / over-range values before they reach the sighash.
+   */
+  // eslint-disable-next-line class-methods-use-this
+  private assertMoneyRange(satoshis: number, i: number): void {
+    if (!Number.isInteger(satoshis) || satoshis < 0) {
+      throw new Error(
+        `Prevout verification failed: input ${i} has a non-integer or negative satoshi value: ${satoshis}`,
+      );
+    }
+    if (BigInt(satoshis) > MAX_MONEY) {
+      throw new Error(
+        `Prevout verification failed: input ${i} satoshi value ${satoshis} exceeds MAX_MONEY (${MAX_MONEY}).`,
+      );
+    }
+  }
+
+  /**
+   * Guard against the classic SIGHASH_SINGLE bug (M-5): a signer at input index
+   * `i` with `i >= outputs.length` signs the zeroed (all-ones) output hash,
+   * which is a well-known footgun. Reject it up front with a clear error.
+   * The `hashtype` carries the forkId flag OR'd in, so mask to the base type.
+   */
+  private assertSingleHasOutput(hashtype: number, i: number): void {
+    if ((hashtype & 0x1f) === HashType.SIGHASH_SINGLE && i >= this.outputs.length) {
+      throw new Error(
+        `SIGHASH_SINGLE signer at input index ${i} has no corresponding output `
+        + `(only ${this.outputs.length} output(s)); this would sign the zeroed output hash`,
+      );
     }
   }
 
@@ -483,4 +705,17 @@ export class Transaction {
  */
 function toBigSat(amount: SatoshiAmount): bigint {
   return typeof amount === 'bigint' ? amount : BigInt(amount);
+}
+
+/**
+ * Decode an unsigned little-endian byte array (e.g. libauth's 8-byte output
+ * `satoshis`) to a bigint. Used only to render human-readable amounts in
+ * prevout-verification error messages.
+ */
+function leBytesToBigInt(bytes: Uint8Array): bigint {
+  let value = 0n;
+  for (let k = bytes.length - 1; k >= 0; k -= 1) {
+    value = (value << 8n) | BigInt(bytes[k]);
+  }
+  return value;
 }

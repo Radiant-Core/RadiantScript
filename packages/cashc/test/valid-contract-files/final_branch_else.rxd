@@ -1,0 +1,15 @@
+pragma radiantscript ^1.0.0;
+
+// A terminal `if`/`else` where BOTH blocks end in a require() must still compile
+// successfully. Regression test for C-1: only the no-else case is rejected.
+contract Vault(pubkey owner) {
+    return {
+        spend(sig s, int mode) {
+            if (mode == 1) {
+                require(checkSig(s, owner));
+            } else {
+                require(mode == 0);
+            }
+        }
+    }
+}

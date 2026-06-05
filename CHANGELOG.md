@@ -14,7 +14,43 @@ to the corresponding finding — lives in [`SECURITY_AUDIT_REPORT.md`](./SECURIT
 
 ## [Unreleased]
 
-Nothing yet.
+### 2026-06-04 red-team remediation (see [`SECURITY_AUDIT_REPORT.md` §11](./SECURITY_AUDIT_REPORT.md))
+
+A fresh adversarial pass found 16 issues beyond the §1–§10 "all closed" set — including a
+**CRITICAL** compiler miscompile — all now fixed and regression-tested
+(534 tests passing, lint clean, all `dist/` rebuilt).
+
+#### `@radiantscript/rxdc` (compiler) — Fixed
+- **[CRITICAL]** A function whose final statement was an `if` with **no `else`** compiled to an
+  unconditional spend (the false branch fell through to an appended `OP_1`, skipping every
+  `require`). A terminal branch now requires both an `else` and a closing `require` in each block. (§11.1/C-1)
+- **[HIGH]** `bool ==` / `!=` emitted bytewise `OP_EQUAL`; now `OP_NUMEQUAL`/`OP_NUMNOTEQUAL`,
+  so non-canonical bool encodings can't bypass equality gates. (§11.1/H-1)
+- **[MEDIUM]** Integer literals were parsed with `parseInt` (lossy double); now parsed as `BigInt`
+  with an 8-byte script-number range check (`IntLiteralOverflowError`). (§11.1/M-1)
+- **[LOW]** Tuple-assignment no longer lets a split half be re-declared at a mismatched fixed
+  `bytesN` bound; oversized `LockingBytecodeNullData` literal chunks (>255 bytes) now error. (§11.1/L-1, L-4)
+
+#### `radiantscript` (SDK) — Fixed
+- **[HIGH]** Full prevout verification before signing: `Transaction.build()` now fetches each
+  input's source transaction, authenticates it (`hash256 == txid`), and asserts the prevout's
+  value and locking script match what is being signed — so a malicious/buggy provider cannot make
+  you sign over a wrong amount or a UTXO you don't control. Values are range-checked to Radiant's
+  consensus `[0, MAX_MONEY]` (new `MAX_MONEY` constant). Default-on; opt out with
+  `.withoutPrevoutVerification()` for offline signing. (§11.2/H-2, §11.5)
+- **[HIGH]** `Transaction.getTxDetails` verifies returned tx hex hashes to the requested txid. (§11.2/H-3)
+- **[HIGH]** Change-output fee now scales with `feePerByte` (was a flat 32 → underpaid on Radiant's
+  relay floor). (§11.2/H-4)
+- **[MEDIUM]** `withHardcodedFee(0)` is honored as a true zero fee; `BitcoinRpcNetworkProvider`
+  rounds/validates satoshis; all providers run returned UTXOs through `validateUtxo`;
+  `SIGHASH_SINGLE` signers with no corresponding output are rejected. (§11.2/M-2…M-5)
+- **[LOW]** Mixed covenant hash types are rejected; `getBalance()` sums in bigint. (§11.2/L-2, L-3)
+
+#### Examples — Changed
+- `examples/radiant/*` hardened (StatefulCounter, NFT, TokenSwap, FungibleToken, MultiSigVault now
+  compile and add the missing covenant constraints) and `README.md` relabelled as audited teaching
+  templates rather than production-safe; false "no counterparty risk" / "automatic supply
+  conservation" claims removed. (§11.3/M-6)
 
 ---
 

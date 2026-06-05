@@ -321,10 +321,16 @@ export class BoolLiteralNode extends LiteralNode {
 }
 
 export class IntLiteralNode extends LiteralNode {
+  // Stored as a bigint to preserve exact integer values up to the 8-byte script
+  // number bound (a JS double cannot represent integers beyond 2^53 exactly).
+  // The constructor accepts a number for convenience and normalises to bigint.
+  public value: bigint;
+
   constructor(
-    public value: number,
+    value: number | bigint,
   ) {
     super();
+    this.value = BigInt(value);
     this.type = PrimitiveType.INT;
   }
 

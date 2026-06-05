@@ -31,6 +31,7 @@ import {
   PushRefNode,
   ParameterNode,
   HexLiteralNode,
+  IntLiteralNode,
 } from '../ast/AST.js';
 import AstTraversal from '../ast/AstTraversal.js';
 import {
@@ -63,11 +64,44 @@ export default class TypeCheckTraversal extends AstTraversal {
       throw new TupleAssignmentError(node.tuple);
     }
     const tupleType = node.tuple.left.type;
-    for (const variable of [node.var1, node.var2]) {
+    const splitIndex = node.tuple.right;
+
+    // When the source is bounded bytes and the split index is a constant, we can
+    // compute the exact width of each half: var1 = `index` bytes, var2 = the
+    // remaining `bound - index` bytes. A declared bound that disagrees with the
+    // computed width is a lie about the value's size and must be rejected.
+    const sourceBound = tupleType instanceof BytesType ? tupleType.bound : undefined;
+    const constIndex = splitIndex instanceof IntLiteralNode ? Number(splitIndex.value) : undefined;
+    const expectedBounds = sourceBound !== undefined && constIndex !== undefined
+      ? [constIndex, sourceBound - constIndex]
+      : [undefined, undefined];
+
+    for (const [i, variable] of [node.var1, node.var2].entries()) {
+      // When both sides are bytes and the half-width is statically known, the
+      // declared bound must match that width exactly. This runs even when
+      // `implicitlyCastable` accepts the assignment (e.g. bytes32 -> bytes32),
+      // because the source bound is the whole width, not this half's width — the
+      // escape hatch below would otherwise let a wrong declared bound through.
+      if (tupleType instanceof BytesType && variable.type instanceof BytesType) {
+        const expected = expectedBounds[i];
+        if (
+          expected !== undefined
+          && variable.type.bound !== undefined
+          && variable.type.bound !== expected
+        ) {
+          throw new AssignTypeError(
+            new VariableDefinitionNode(variable.type, '', variable.name, node.tuple),
+          );
+        }
+      }
+
       if (!implicitlyCastable(tupleType, variable.type)) {
-        // Ignore if both are of type byte. problem: bytes16 can be typed to bytes32
+        // Ignore if both are of type bytes. The half-widths could not be verified
+        // statically here (unbounded source or non-constant split index), so the
+        // declared bound is allowed but remains unchecked. problem: bytes16 can be
+        // typed to bytes32
         if (tupleType instanceof BytesType && variable.type instanceof BytesType) {
-          return node;
+          continue;
         }
         throw new AssignTypeError(
           new VariableDefinitionNode(variable.type, '', variable.name, node.tuple),

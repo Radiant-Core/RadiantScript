@@ -13,6 +13,7 @@ import {
   createInputScript,
   getInputSize,
   getPreimageSize,
+  validateUtxo,
 } from '../src/utils.js';
 import { Network } from '../src/interfaces.js';
 import * as fixtures from './fixture/vars.js';
@@ -124,6 +125,39 @@ describe('utils', () => {
 
       expect(scriptToAddress(redeemScript, Network.MAINNET))
         .not.toEqual(scriptToAddress(redeemScript, Network.TESTNET));
+    });
+  });
+
+  // M-4 / M-3: providers are untrusted, so every returned UTXO is run through
+  // validateUtxo. A malformed UTXO (bad txid / negative or non-integer vout /
+  // negative / non-integer / overflow satoshis) must be rejected.
+  describe('validateUtxo', () => {
+    const valid = { txid: 'a'.repeat(64), vout: 0, satoshis: 1000 };
+
+    it('accepts a well-formed mainnet UTXO unchanged', () => {
+      expect(validateUtxo(valid)).toBe(valid);
+    });
+
+    it('preserves extra fields (e.g. height) on valid UTXOs', () => {
+      const withHeight = { ...valid, height: 12345 };
+      expect(validateUtxo(withHeight)).toEqual(withHeight);
+    });
+
+    it('rejects a txid that is not 64 lowercase hex chars', () => {
+      expect(() => validateUtxo({ ...valid, txid: 'xyz' })).toThrow(/txid/);
+      expect(() => validateUtxo({ ...valid, txid: 'A'.repeat(64) })).toThrow(/txid/);
+      expect(() => validateUtxo({ ...valid, txid: 'a'.repeat(63) })).toThrow(/txid/);
+    });
+
+    it('rejects a negative or non-integer vout', () => {
+      expect(() => validateUtxo({ ...valid, vout: -1 })).toThrow(/vout/);
+      expect(() => validateUtxo({ ...valid, vout: 1.5 })).toThrow(/vout/);
+    });
+
+    it('rejects negative, non-integer, or overflow satoshis', () => {
+      expect(() => validateUtxo({ ...valid, satoshis: -1 })).toThrow(/satoshis/);
+      expect(() => validateUtxo({ ...valid, satoshis: 1.5 })).toThrow(/satoshis/);
+      expect(() => validateUtxo({ ...valid, satoshis: NaN })).toThrow(/satoshis/);
     });
   });
 });

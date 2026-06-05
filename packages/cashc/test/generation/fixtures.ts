@@ -177,7 +177,9 @@ export const fixtures: Fixture[] = [
       ],
       asm:
         // require((ripemd160(bytes(pk)) == hash160(0x0) == !true));
-        'OP_OVER OP_RIPEMD160 OP_0 OP_HASH160 OP_EQUAL OP_1 OP_NOT OP_EQUALVERIFY OP_SWAP '
+        // The inner bytes20 comparison stays bytewise (OP_EQUAL); the outer bool
+        // comparison lowers to numeric OP_NUMEQUALVERIFY (see H-1 fix).
+        'OP_OVER OP_RIPEMD160 OP_0 OP_HASH160 OP_EQUAL OP_1 OP_NOT OP_NUMEQUALVERIFY OP_SWAP '
         // require(checkSig(s, pk));
         + 'OP_CHECKSIG',
     },
@@ -439,15 +441,17 @@ export const fixtures: Fixture[] = [
         // int changeAmount = tx.inputs[this.activeInputIndex].value - minerFee
         + 'OP_INPUTINDEX OP_UTXOVALUE OP_OVER OP_SUB '
         // if (changeAmount >= minerFee)
-        + 'OP_DUP OP_ROT OP_GREATERTHANOREQUAL OP_IF '
+        + 'OP_2DUP OP_LESSTHANOREQUAL OP_IF '
         // require(
         //  tx.outputs[1].lockingBytecode == tx.inputs[this.activeInputIndex].lockingBytecode
         // )
         + 'OP_1 OP_OUTPUTBYTECODE OP_INPUTINDEX OP_UTXOBYTECODE OP_EQUALVERIFY '
         // require(tx.outputs[1].value == changeAmount) }
-        + 'OP_1 OP_OUTPUTVALUE OP_OVER OP_NUMEQUALVERIFY OP_ENDIF '
+        + 'OP_1 OP_OUTPUTVALUE OP_OVER OP_NUMEQUALVERIFY '
+        // else { require(changeAmount < minerFee) }
+        + 'OP_ELSE OP_2DUP OP_GREATERTHAN OP_VERIFY OP_ENDIF '
         // Stack clean-up
-        + 'OP_DROP OP_1',
+        + 'OP_2DROP OP_1',
     },
   },
   {

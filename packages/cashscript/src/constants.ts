@@ -40,3 +40,16 @@ export const MAX_TRANSACTION_SIZE = 100000; // 100KB transaction limit
 export const MAX_INPUT_COUNT = 1000; // Reasonable input limit
 export const MAX_OUTPUT_COUNT = 1000; // Reasonable output limit
 export const MAX_SAFE_SATOSHIS = BigInt('0xFFFFFFFFFFFFFFFF'); // 64-bit unsigned max
+
+/**
+ * Radiant consensus money-range ceiling, in photons (satoshis).
+ *
+ * Unlike Bitcoin (`MAX_MONEY = 21,000,000 × COIN`), Radiant sets
+ * `MAX_MONEY = Amount::max() = 2,100,000,000,000,000,000` photons
+ * (21,000,000,000 RXD × 1e8) — see Radiant-Node `src/amount.h`. Any satoshi
+ * value a transaction commits to must satisfy `0 ≤ v ≤ MAX_MONEY`; values
+ * above this are non-consensus and are rejected by prevout verification.
+ *
+ * This exceeds `Number.MAX_SAFE_INTEGER` (≈9.007e15) so it is a bigint.
+ */
+export const MAX_MONEY = 2_100_000_000_000_000_000n;

@@ -5,7 +5,7 @@ import { PrivateKey } from '@radiant-core/radiantjs';
 // NFT (Non-Fungible Token) Usage Example
 // Demonstrates minting and transferring singleton NFTs
 
-async function main() {
+async function main(): Promise<void> {
   // Compile with debug info
   const artifact = compileFile('./NFT.rxd', { debug: true });
   

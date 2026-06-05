@@ -329,3 +329,63 @@ Everything else from §1–§9 is now either FIXED, intentionally documented as 
 ---
 
 *End of 2026-05-28 final remediation pass.*
+
+---
+
+## 11. 2026-06-04 Red-Team Pass
+
+A fresh adversarial pass was run *because* §1–§10 declared everything closed — the goal was to find the bugs a "done" audit misses. It did. The headline is a **live CRITICAL compiler bug that silently produces always-spendable contracts** (§11.1/C-1) — the exact failure class as the OP_2MUL/OP_2DIV miscompile, and proof that "all findings FIXED" was premature. Sixteen findings were confirmed (3 of them proven by compiling exploit contracts through the built `rxdc 1.1.1-v2`) and **all sixteen are now fixed and regression-tested**.
+
+**End state: 449 root (cashc + utils) + 96 cashscript unit = 545 tests passing, 0 failing; `npm run lint` clean; all three package `dist/` rebuilt; all five `examples/radiant/*.rxd` compile.** Baselines at start of pass were 440 root + 68 cashscript. (H-2 was subsequently upgraded from a range-check to full prevout verification — §11.5 — adding the final 11 cashscript tests.)
+
+### 11.1 Compiler (`cashc` / `utils`)
+
+- **[CRITICAL] C-1 — terminal `if` with no `else` compiled to an unconditional spend.** [`EnsureFinalRequireTraversal.ts:50`](packages/cashc/src/semantic/EnsureFinalRequireTraversal.ts:50). A final `BranchNode` was checked via `finalStatement.elseBlock?.statements`; with no else that is `undefined` → defaults to `[]` → `statements[-1]` is `undefined` → the pass returned silently without requiring the else path. `removeFinalVerify` then appended `OP_1` after `OP_ENDIF`, so a spend taking the false branch succeeded with **no signature/condition check**. *Proven:* `if (mode == 1) { require(checkSig(s, owner)); }` (no else) compiled to `… OP_IF … OP_CHECKSIGVERIFY OP_ENDIF OP_DROP OP_1` — spendable by anyone with `mode != 1`. **Fix:** a terminal branch must now have an `else`, and both blocks must themselves terminate in a `require` (else → `FinalRequireStatementError`). Negative fixture `final_branch_no_else.cash` + valid `final_branch_else.rxd` added. (The shipped `announcement.cash` example actually exhibited the bug — fixed with an explicit `else`.)
+- **[HIGH] H-1 — `bool ==` / `!=` emitted bytewise `OP_EQUAL` instead of `OP_NUMEQUAL`.** [`GenerateTargetTraversal.ts` `visitBinaryOp`](packages/cashc/src/generation/GenerateTargetTraversal.ts:463) + [`types.ts:153`](packages/utils/src/types.ts:153). `resultingType(BOOL,BOOL)` is `BOOL`, so `isNumeric` was false and bool equality compiled bytewise — two logically-true bools with different encodings (`0x01` vs `0x02`) compared unequal, letting an attacker-supplied bool param bypass an equality gate. **Fix:** treat `BOOL` as numeric for `==`/`!=` (→ `OP_NUMEQUAL`/`OP_NUMNOTEQUAL`); confirmed `TypeCheck` forbids arithmetic on bool so no other operator is affected. Generation test added.
+- **[MEDIUM] M-1 — integer literals parsed with `parseInt` (lossy double).** [`AstBuilder.ts` `createIntLiteral`](packages/cashc/src/ast/AstBuilder.ts). `9007199254740993` (2⁵³+1) silently became 2⁵³; oversized literals exceeded the 8-byte script-number bound with no diagnostic. **Fix:** parse value + unit multiplier as `BigInt`, range-check `±(2⁶³−1)`, throw new `IntLiteralOverflowError` on overflow; `IntLiteralNode.value` widened to `bigint`. *Proven:* 2⁵³+1 now encodes exactly `01000000000020`; 2⁶³ errors.
+- **[LOW] L-1 — tuple-assign bytes-bound escape.** [`TypeCheckTraversal.ts` `visitTupleAssignment`](packages/cashc/src/semantic/TypeCheckTraversal.ts:66). `bytes16 a, bytes32 b = data.split(16)` was accepted with no width enforcement. **Fix:** when the source is bounded bytes and the split index is a constant, the exact half-widths are computed and a disagreeing declared bound is rejected (`AssignTypeError`); unbounded sources / non-constant indices stay permissive so existing split contracts still compile.
+- **[LOW] L-4 — `LockingBytecodeNullData` size prefix only handled ≤255 bytes.** [`GenerateTargetTraversal.ts` NULLDATA](packages/cashc/src/generation/GenerateTargetTraversal.ts:401). **Fix:** literal chunks >255 bytes now throw `NullDataSizeError` at compile time; the dynamic-size branch's ≤255 limitation is documented in-code.
+
+### 11.2 SDK (`cashscript`)
+
+- **[HIGH] H-2 — input satoshis from the network provider were signed into the sighash unvalidated.** [`Transaction.ts`](packages/cashscript/src/Transaction.ts) → [`utils.ts`](packages/cashscript/src/utils.ts). A lying server could make the SDK commit to a wrong input amount (invalid-sig griefing, or skewed covenant payout math in RadiantMM/RadiantSwap). **Fix:** every input's `satoshis` runs through `validateAmount`, **and** `build()` now performs full prevout verification before signing — see §11.5.
+- **[HIGH] H-3 — `getTxDetails` trusted server tx hex without checking it hashes to the requested txid.** [`Transaction.ts` `getTxDetails`](packages/cashscript/src/Transaction.ts). Enabled "confirmed but isn't" forged state. **Fix:** `binToHex(hash256(bytes).reverse())` is compared to the requested `txid`; mismatch throws (and now propagates instead of being swallowed by the retry loop).
+- **[HIGH] H-4 — change-output fee ignored `feePerByte`.** [`Transaction.ts`](packages/cashscript/src/Transaction.ts). The change output's cost was a flat `P2SH_OUTPUT_SIZE` (32) with no rate factor → systematic underpayment given Radiant's high relay floor. **Fix:** `change -= ceil(P2SH_OUTPUT_SIZE * feePerByte)`. Test asserts the change cost scales with the rate (mutation-verified).
+- **[MEDIUM] M-2 — `withHardcodedFee(0)` was silently overridden.** [`Transaction.ts`](packages/cashscript/src/Transaction.ts). Line 401 honored `0` via `??`, but three sibling branches gated on `!this.hardcodedFee`. **Fix:** single `useHardcodedFee = hardcodedFee !== undefined` used everywhere; `0` now yields a true zero fee.
+- **[MEDIUM] M-3 — `BitcoinRpcNetworkProvider` float-multiplied coin amounts.** [`BitcoinRpcNetworkProvider.ts`](packages/cashscript/src/network/BitcoinRpcNetworkProvider.ts). `amount * 1e8` produced non-integers that threw in `BigInt()` for honest nodes. **Fix:** `Math.round` + finite/non-negative guard, then routed through the new `validateUtxo`.
+- **[MEDIUM] M-4 — providers didn't validate returned UTXOs.** All four providers. **Fix:** shared `validateUtxo()` in [`utils.ts`](packages/cashscript/src/utils.ts) (txid `^[0-9a-f]{64}$`, integer `vout ≥ 0`, integer `satoshis ∈ [0, MAX_SAFE_SATOSHIS]`); `BitboxNetworkProvider` previously returned UTXOs unmapped — now mapped + validated.
+- **[MEDIUM] M-5 — `SIGHASH_SINGLE` input with index ≥ output count signed the zeroed output hash.** [`Transaction.ts`](packages/cashscript/src/Transaction.ts). **Fix:** `assertSingleHasOutput` throws when a `SIGHASH_SINGLE` signer has no corresponding output, on both signing paths.
+- **[LOW] L-2 — mixed covenant hash types.** [`Transaction.ts`](packages/cashscript/src/Transaction.ts). The on-stack preimage used only the first signer's hash type. **Fix:** differing hash types among covenant signature args now throw.
+- **[LOW] L-3 — `getBalance()` summed in `number`.** [`Contract.ts`](packages/cashscript/src/Contract.ts). **Fix:** sums in `bigint`; throws past `Number.MAX_SAFE_INTEGER` rather than silently rounding (public `number` return kept).
+
+### 11.3 Example library (`examples/radiant/`)
+
+- **[MEDIUM] M-6 — templates were marketed as a "Standard Library" but were under-constrained** (and four of five did not even compile under the 1.x grammar). **Fix (both hardened *and* relabelled):**
+  - *StatefulCounter* — now authenticates `currentCount` against the input's own state, pins a single same-code continuation, conserves value, and binds the next state to `newCount` (limitation: fixed 4-byte count push, documented).
+  - *NFT* — pins the carrier output to the same code script so the singleton can't escape after one hop; `transferWithData` binds `stateScript` on the ref-carrying output.
+  - *TokenSwap* — adds `refValueSum($wantTokenRef) == tx.outputs[0].value` so the want-ref is provably on the maker's pinned output; `cancel()` now conserves the offer ref back to the maker.
+  - *FungibleToken* — `burn()` routes the burned value to a provable `OP_RETURN`; the on-chain `stateScript.split(1)` parse asserts length + leading push byte (blocks the truncation-spoofed owner).
+  - *MultiSigVault* — `spendWithMinOutput` pins `outputs[0].lockingBytecode` to a recipient and requires change back to the vault script.
+  - `README.md` — dropped the false "No counterparty risk" / "Automatic supply conservation" claims, added a **TEACHING TEMPLATES — independently audit before production** banner, and documented the "token amount == satoshi value" semantic and the missing "output[i] carries ref X with value Y" opcode. Every `.rxd` carries an `// AUDIT:` header and precise `// LIMITATION:` notes; no guarantee was faked to compile.
+
+### 11.4 Verification
+
+Three exploit contracts that compiled before now behave correctly: the no-else bypass is **rejected**; `bool !=` emits `OP_NUMNOTEQUAL`; `9007199254740993` encodes exactly. Full suites green (545 passing, 0 failing), repo lint clean, all `dist/` rebuilt (the OP_2MUL/OP_2DIV regression shipped precisely because `dist/` was stale — not repeated here). Remaining residual limitations are documented in-code rather than silently assumed.
+
+---
+
+### 11.5 H-2 follow-up — full prevout verification before signing
+
+The initial H-2 fix range-validated input satoshis but still trusted the provider's reported value/script. This follow-up closes that gap completely, because RadiantMM and RadiantSwap covenants derive payouts/splits from the value the SDK commits to the sighash. `Transaction.build()` now runs `verifyPrevouts()` **before signing** (default-on; opt out with `.withoutPrevoutVerification()` for offline signing):
+
+1. **Authenticated fetch.** Each input's source transaction is fetched once per unique txid (in parallel) and its display txid is re-derived as `reverse(hash256(rawtx))`. If it doesn't equal the outpoint txid the spender already committed to, it's rejected. This is the crux: a malicious provider **cannot** forge a source tx with altered values, because the forgery would no longer hash to the committed txid — so the value/script assertions below are trustworthy even against a fully hostile provider, not just a buggy one.
+2. **Outpoint range.** `vout` must index an existing output of the source tx.
+3. **Value match.** The prevout's 8-byte LE value must equal the `satoshis` being signed (libauth 1.19 decodes output value as `Uint8Array`; compared byte-for-byte against `bigIntToBinUint64LE(satoshis)`).
+4. **Script match.** The prevout `lockingBytecode` must equal the script being unlocked — the contract's P2SH script (`addressToLockScript(this.address)`) for covenant inputs, or the P2PKH script of the signing key for `experimentalFromP2PKH` inputs. This rejects a UTXO that doesn't belong to the address being spent.
+5. **Consensus money range.** `assertMoneyRange` requires every committed value to be an integer in `[0, MAX_MONEY]`, where the new [`MAX_MONEY`](packages/cashscript/src/constants.ts) constant is Radiant's `Amount::max()` = `2,100,000,000,000,000,000` photons (21e9 RXD × 1e8 — 1000× Bitcoin; sourced from Radiant-Node `src/amount.h`).
+
+The H-3 txid derivation was factored into a shared `computeDisplayTxid` used by both `getTxDetails` and `verifyPrevouts`. **11 new tests** in [`Transaction.test.ts`](packages/cashscript/test/Transaction.test.ts) cover the happy path, each rejection branch (value mismatch, wrong script, unauthenticated/forged source tx, missing vout, unfetchable source, the opt-out), and the `MAX_MONEY` boundary; the value-equality assertion was mutation-verified to fail when disabled. Existing fee/signing tests that use synthetic UTXOs call `.withoutPrevoutVerification()`. **End state: 449 root + 96 cashscript = 545 passing, 0 failing.**
+
+---
+
+*End of 2026-06-04 red-team pass.*

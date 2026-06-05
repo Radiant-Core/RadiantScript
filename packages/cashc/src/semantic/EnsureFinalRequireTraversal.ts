@@ -46,10 +46,15 @@ function ensureFinalStatementIsRequire(statements: StatementNode[] = []): void {
 
   if (!finalStatement) return;
 
-  // If the final statement is a branch node, then both branches need to end with a require()
+  // If the final statement is a branch node, then both branches need to end with a require().
+  // A terminal branch without an else block is rejected: the implicit (missing) else path
+  // would otherwise spend unconditionally, since codegen appends OP_1 after OP_ENDIF.
   if (finalStatement instanceof BranchNode) {
+    if (!finalStatement.elseBlock) {
+      throw new FinalRequireStatementError(finalStatement);
+    }
     ensureFinalStatementIsRequire(finalStatement.ifBlock.statements);
-    ensureFinalStatementIsRequire(finalStatement.elseBlock?.statements);
+    ensureFinalStatementIsRequire(finalStatement.elseBlock.statements);
     return;
   }
 

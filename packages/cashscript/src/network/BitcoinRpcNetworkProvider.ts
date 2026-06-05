@@ -1,5 +1,6 @@
 import { Utxo, Network } from '../interfaces.js';
 import NetworkProvider from './NetworkProvider.js';
+import { validateUtxo } from '../utils.js';
 
 const RpcClientRetry = require('bitcoin-rpc-promise-retry');
 
@@ -17,11 +18,24 @@ export default class BitcoinRpcNetworkProvider implements NetworkProvider {
   async getUtxos(address: string): Promise<Utxo[]> {
     const result = await this.rpcClient.listUnspent(0, 9999999, [address]);
 
-    const utxos = result.map((utxo) => ({
-      txid: utxo.txid,
-      vout: utxo.vout,
-      satoshis: utxo.amount * 1e8,
-    }));
+    // `amount` is RXD as a float; converting to satoshis via `* 1e8` yields a
+    // non-integer for honest nodes (BigInt would throw downstream) and could be
+    // negative/huge for a malicious one. Round to the nearest integer satoshi
+    // and validate the result is a finite, non-negative integer (M-3); then run
+    // the full UTXO validation (M-4).
+    const utxos = result.map((utxo) => {
+      const satoshis = Math.round(utxo.amount * 1e8);
+      if (!Number.isFinite(satoshis) || satoshis < 0) {
+        throw new Error(
+          `Invalid UTXO ${utxo.txid}: amount ${utxo.amount} converts to invalid satoshis ${satoshis}`,
+        );
+      }
+      return validateUtxo({
+        txid: utxo.txid,
+        vout: utxo.vout,
+        satoshis,
+      });
+    });
 
     return utxos;
   }

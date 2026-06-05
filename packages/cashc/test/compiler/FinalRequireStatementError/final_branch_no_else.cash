@@ -1,0 +1,14 @@
+pragma radiantscript ^1.0.0;
+
+// A terminal `if` whose only block ends in a require() but which has NO else
+// block must be rejected: the implicit (missing) else path would otherwise spend
+// unconditionally (codegen appends OP_1 after OP_ENDIF). Regression test for C-1.
+contract Vault(pubkey owner) {
+    return {
+        spend(sig s, int mode) {
+            if (mode == 1) {
+                require(checkSig(s, owner));
+            }
+        }
+    }
+}

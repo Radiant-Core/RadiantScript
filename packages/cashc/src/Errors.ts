@@ -277,10 +277,28 @@ export class PushTypeError extends CashScriptError {
   }
 }
 
+export class IntLiteralOverflowError extends ParseError {
+  constructor(
+    value: bigint,
+    location?: Point | Location,
+  ) {
+    super(`Integer literal ${value} does not fit in a signed 8-byte script number`, location);
+  }
+}
+
 export class UnsupportedOperatorError extends CashScriptError {
   constructor(
     node: BinaryOpNode,
   ) {
     super(node, `Operator '${node.operator}' is not supported on the Radiant network`);
+  }
+}
+
+export class NullDataSizeError extends CashScriptError {
+  constructor(
+    node: Node,
+    byteLength: number,
+  ) {
+    super(node, `Nulldata chunk of ${byteLength} bytes is too large; the nulldata builder only supports chunks up to 255 bytes`);
   }
 }

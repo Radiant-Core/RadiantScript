@@ -1,70 +1,89 @@
 pragma radiantscript ^1.1.0;
 
-// FungibleToken - A transferable fungible token contract for Radiant
-// Uses reference-based token tracking with conservation enforcement.
+// AUDIT: P2PKH-style fungible token keyed by a ref. Ownership is the pkh embedded
+// in each UTXO's state (not a constructor key). transfer() conserves value and
+// forces every ref carrier to stay in THIS code script (no foreign-script escape).
+// burn() additionally routes the burned satoshi value to a provably-unspendable
+// OP_RETURN output, so supply reduction is on-chain provable, not merely "not
+// re-deposited". The state parse is hardened (length + leading-push byte asserted
+// before splitting) to block a truncation-spoofed owner. Residual limitation:
+// "token amount == satoshi value" (see LIMITATION below).
 //
-// Design: ownership is NOT locked to a single constructor pubkey.
-// Instead, each token UTXO embeds the holder's pkh in its state section
-// (20 bytes before OP_STATESEPARATOR). Any holder who can sign with the
-// matching key can transfer or burn. This mirrors how P2PKH coins work
-// and allows tokens to circulate without a central authority.
+// FungibleToken - A transferable fungible token contract for Radiant.
 //
-// UTXO state layout: <20-byte pkh> OP_STATESEPARATOR <code script>
+// Design: ownership is NOT locked to a single constructor pubkey. Each token
+// UTXO embeds the holder's pkh in its state section (a single 0x14 push of 20
+// bytes before OP_STATESEPARATOR). Any holder who can sign with the matching key
+// can transfer or burn. This mirrors P2PKH and lets tokens circulate without a
+// central authority.
 //
-// Usage:
-//   1. Mint: create a UTXO with this code script and the first holder's
-//      pkh in the state section.
-//   2. Transfer: spend with the holder's signature; set the new holder's
-//      pkh in every output that carries $tokenRef. The contract enforces
-//      that every such output also uses this FungibleToken code script,
-//      so the token cannot escape into a non-FungibleToken script.
-//   3. Burn: same constraints as Transfer, plus an explicit burnAmount.
+// UTXO state layout (STRICT): 0x14 <20-byte pkh> OP_STATESEPARATOR <code script>
+//
+// Security model:
+// - Spend requires a signature from the key whose pkh is embedded in state.
+// - The embedded pkh is read only AFTER asserting the state is exactly a 21-byte
+//   `0x14 <20 bytes>` push — a truncated/oversized state is rejected, so an
+//   attacker cannot splice a shorter state to spoof a different owner.
+// - Every output carrying $tokenRef must use THIS code script
+//   (codeScriptCount == refOutputCount), so the token cannot escape into a
+//   script that drops these rules.
+// - Value is conserved across the constrained outputs (codeScriptValueSum).
+// - burn() sends exactly burnAmount satoshis to an OP_RETURN nulldata output,
+//   which is provably unspendable — the supply is destroyed, not parked.
+//
+// LIMITATION: in Radiant a ref carrier's "token amount" IS its satoshi value;
+// codeScriptValueSum / refValueSum sum that satoshi value. There is no opcode
+// proving "output[i] carries ref X with amount Y" in isolation, so conservation
+// is enforced in aggregate over the code script. burn() pins the OP_RETURN at a
+// FIXED index (output[1]); the required output layout is documented below and
+// must be produced by the transaction builder. This template does NOT bound the
+// number of token outputs, so a holder may split across many same-code outputs.
 
 contract FungibleToken(
     bytes36 constant $tokenRef   // The unique token reference (txid:vout)
 ) {
     return {
         // Transfer tokens to new holder(s).
-        // The spender proves ownership by signing with the key whose pkh is
-        // embedded in this UTXO's state.
+        // Required outputs: each $tokenRef carrier uses this code script and
+        // embeds the new holder's pkh in its 0x14-prefixed state.
         transfer(pubkey senderPk, sig s) {
-            // Verify sender's signature
             require(checkSig(s, senderPk));
 
-            // Verify senderPk matches the pkh stored in this UTXO's state section
-            // State script layout is `0x14 <20-byte pkh>` (a single direct
-            // push of the holder's pkh). Strip the leading 1-byte push
-            // opcode before comparing.
-            bytes20 embeddedPkh = bytes20(tx.inputs[this.activeInputIndex].stateScript.split(1)[1]);
+            // Hardened owner parse: assert the exact 0x14 + 20-byte push shape
+            // BEFORE splitting, so a truncation-spoofed state cannot impersonate
+            // another owner.
+            bytes state = tx.inputs[this.activeInputIndex].stateScript;
+            require(state.length == 21);
+            require(state.split(1)[0] == 0x14);
+            bytes20 embeddedPkh = bytes20(state.split(1)[1]);
             require(hash160(senderPk) == embeddedPkh);
 
-            // Track the token reference
+            // Track the token reference.
             pushInputRef($tokenRef);
 
-            // Hash this UTXO's code script so we can ask Radiant's
-            // introspection ops about it across outputs.
+            // Constrain every $tokenRef carrier to THIS code script.
             bytes32 csh = hash256(tx.inputs[this.activeInputIndex].codeScript);
-
-            // Every output carrying $tokenRef MUST also have this code script.
-            // Without this check, a holder could split the token into an
-            // output whose script does not enforce FungibleToken's rules —
-            // refValueSum conservation alone is satisfied by such a split.
             require(tx.outputs.codeScriptCount(csh) == tx.outputs.refOutputCount($tokenRef));
 
-            // Enforce token-value conservation across the constrained outputs.
+            // Value (== token amount) conservation across the constrained outputs.
             require(tx.inputs.codeScriptValueSum(csh) == tx.outputs.codeScriptValueSum(csh));
         },
 
-        // Burn tokens (intentionally reduce supply). The same all-outputs
-        // constraint as transfer() applies, so any remainder must stay
-        // inside the FungibleToken script.
+        // Burn tokens (intentionally reduce supply). The remainder stays inside
+        // the FungibleToken script; the burned amount is provably destroyed by
+        // routing it to an OP_RETURN nulldata output.
+        //
+        // Required output layout:
+        //   output[0..] : same-code carriers holding (inputTokens - burnAmount)
+        //   output[1]   : OP_RETURN nulldata carrying exactly burnAmount satoshis
         burn(pubkey senderPk, sig s, int burnAmount) {
             require(checkSig(s, senderPk));
 
-            // State script layout is `0x14 <20-byte pkh>` (a single direct
-            // push of the holder's pkh). Strip the leading 1-byte push
-            // opcode before comparing.
-            bytes20 embeddedPkh = bytes20(tx.inputs[this.activeInputIndex].stateScript.split(1)[1]);
+            // Hardened owner parse (same as transfer()).
+            bytes state = tx.inputs[this.activeInputIndex].stateScript;
+            require(state.length == 21);
+            require(state.split(1)[0] == 0x14);
+            bytes20 embeddedPkh = bytes20(state.split(1)[1]);
             require(hash160(senderPk) == embeddedPkh);
 
             pushInputRef($tokenRef);
@@ -75,12 +94,21 @@ contract FungibleToken(
             int inputTokens = tx.inputs.codeScriptValueSum(csh);
             int outputTokens = tx.outputs.codeScriptValueSum(csh);
 
-            // burnAmount must be positive and cannot exceed what is available.
+            // burnAmount must be positive and within the available supply.
             require(burnAmount > 0);
             require(burnAmount <= inputTokens);
 
-            // Output tokens should be less by exactly burnAmount.
+            // Remaining token value is reduced by exactly burnAmount.
             require(inputTokens - burnAmount == outputTokens);
+
+            // Provably destroy the burned value: route exactly burnAmount satoshis
+            // to a standard OP_RETURN (nulldata) output, which can never be spent.
+            // Without this, "burned" value could be diverted to an arbitrary
+            // spendable script; conservation over the code script alone does not
+            // prove destruction.
+            bytes nulldata = new LockingBytecodeNullData([0x00]);
+            require(tx.outputs[1].lockingBytecode == nulldata);
+            require(tx.outputs[1].value == burnAmount);
         }
     }
 }

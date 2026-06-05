@@ -85,7 +85,17 @@ export class Contract {
 
   async getBalance(): Promise<number> {
     const utxos = await this.getUtxos();
-    return utxos.reduce((acc, utxo) => acc + utxo.satoshis, 0);
+    // Sum in bigint so totals above 2^53 don't silently lose precision (L-3).
+    // The public return type stays `number` for backwards compatibility, so we
+    // throw rather than round if the balance genuinely exceeds the safe range —
+    // a caller hitting this should switch to summing UTXOs as bigint directly.
+    const total = utxos.reduce<bigint>((acc, utxo) => acc + BigInt(utxo.satoshis), 0n);
+    if (total > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error(
+        `Balance ${total} exceeds Number.MAX_SAFE_INTEGER; sum getUtxos() satoshis as bigint to retain precision`,
+      );
+    }
+    return Number(total);
   }
 
   async getUtxos(): Promise<Utxo[]> {

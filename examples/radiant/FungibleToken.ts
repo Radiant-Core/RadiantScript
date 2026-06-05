@@ -14,7 +14,7 @@ import { PrivateKey } from '@radiant-core/radiantjs';
 // When transferring to a new owner, you MUST use buildStatefulOutput() to create
 // an output with the new owner's pkh in the state section.
 
-async function main() {
+async function main(): Promise<void> {
   // Compile the contract with debug info for rxdeb
   const artifact = compileFile('./FungibleToken.rxd', { debug: true });
 
@@ -24,14 +24,14 @@ async function main() {
   // Setup CURRENT OWNER keys
   // SECURITY: Never hardcode private keys. Use environment variables or secure key management.
   const ownerPrivKey = PrivateKey.fromWIF(
-    process.env.PRIVATE_KEY_WIF || 'your-private-key-wif'
+    process.env.PRIVATE_KEY_WIF || 'your-private-key-wif',
   );
   const ownerPubKey = ownerPrivKey.toPublicKey();
   const ownerPk = ownerPubKey.toBuffer();
 
   // Setup NEW OWNER keys (the recipient of the transfer)
   const newOwnerPrivKey = PrivateKey.fromWIF(
-    process.env.NEW_OWNER_WIF || 'new-owner-private-key-wif'
+    process.env.NEW_OWNER_WIF || 'new-owner-private-key-wif',
   );
   const newOwnerPubKey = newOwnerPrivKey.toPublicKey();
   const newOwnerPk = newOwnerPubKey.toBuffer();

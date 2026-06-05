@@ -1,40 +1,81 @@
 pragma radiantscript ^1.1.0;
 
-// StatefulCounter - Demonstrates state management with state separator
-// Uses OP_STATESEPARATOR to split state from code
+// AUDIT: Owner-gated singleton counter. Authenticates the current count from the
+// input's own state, binds the next count into the continuation output, and pins
+// exactly one same-code continuation with value conserved. Residual limitation:
+// count is stored as a FIXED 4-byte little-endian push, so it is bounded to
+// 0..2147483647 and wraps/under-flows outside that range (see LIMITATION below).
 //
-// Features:
-// - Persistent counter state across transactions
-// - Code script verification ensures logic cannot change
-// - State section can be updated while preserving contract logic
+// StatefulCounter - Demonstrates state management with the state separator.
+// Uses OP_STATESEPARATOR to split mutable state from immutable code.
 //
-// Usage:
-//   1. Deploy with initial counter value in state section
-//   2. Increment by spending with valid signature
-//   3. Contract verifies output has same code script
+// Security model (what IS enforced):
+// - Only the owner key can increment (checkSig).
+// - The `currentCount` supplied by the spender is AUTHENTICATED against this
+//   input's on-chain state script, so it cannot be forged.
+// - Exactly ONE continuation output carries this exact code script
+//   (codeScriptCount == 1) — no duplication, no second counter.
+// - Satoshi value is conserved across the continuation
+//   (codeScriptValueSum in == out).
+// - The next state is BOUND to currentCount + 1, so the counter must advance
+//   by exactly one and cannot be reset or skipped.
+//
+// State layout convention: <0x04> <4-byte little-endian count> OP_STATESEPARATOR <code>
+// The leading 0x04 is the script push opcode for a 4-byte data push; bytes4(n)
+// is the OP_NUM2BIN fixed-width little-endian encoding of n.
+//
+// LIMITATION: Radiant has no opcode to bind an arbitrary-width minimally-encoded
+// script number into an output's state script and read it back unambiguously.
+// We therefore pin a FIXED 4-byte push. Consequences:
+//   - The counter is correct only for 0 <= count <= 2147483647. Values outside
+//     this range are NOT supported by this template (the 4-byte fixed encoding
+//     would mis-pin / wrap). A production counter that must exceed 2^31-1 needs
+//     a wider fixed width and matching range checks.
+//   - This template does NOT pin tx.outputs.length, so additional unrelated
+//     outputs (e.g. fee change to a P2PKH) are allowed; the singleton guarantee
+//     comes from codeScriptCount == 1 on THIS code script, not from output count.
 
 contract StatefulCounter(
     pubkey ownerPk
 ) function(int currentCount) {
-    // State section: currentCount is passed as function parameter
-    // and stored before the state separator
+    // State section: the live counter value. It is reproduced here only so the
+    // code section can reference it; the actual on-chain value is authenticated
+    // below against tx.inputs[...].stateScript.
     int newCount = currentCount + 1;
-    
+
     stateSeparator;
-    
-    // Code section: logic that must remain unchanged
-    function increment(sig s) {
-        require(checkSig(s, ownerPk));
-        
-        // Get the code script hash of this input
-        bytes myCodeScript = tx.inputs[this.activeInputIndex].codeScript;
-        bytes myCodeHash = hash256(myCodeScript);
-        
-        // Verify at least one output has the same code script
-        int sameCodeOutputs = tx.outputs.codeScriptCount(myCodeHash);
-        require(sameCodeOutputs >= 1);
-        
-        // The new state (newCount) will be in the output's state section
-        // This is handled by the transaction builder
+
+    // Code section: logic that must remain unchanged across spends.
+    return {
+        increment(sig s) {
+            require(checkSig(s, ownerPk));
+
+            // Authenticate currentCount against THIS input's on-chain state.
+            // Without this, currentCount is an unconstrained spender input and
+            // the "+1" binding below would be meaningless.
+            require(tx.inputs[this.activeInputIndex].stateScript == 0x04 + bytes4(currentCount));
+
+            // Hash this input's code script to constrain continuation outputs.
+            bytes myCode = tx.inputs[this.activeInputIndex].codeScript;
+            bytes32 csh = hash256(myCode);
+
+            // Exactly one continuation output carries this code script (singleton).
+            require(tx.outputs.codeScriptCount(csh) == 1);
+
+            // That continuation output MUST be output[0]. Pinning the code script
+            // here ties the singleton, the value sum, and the state binding below
+            // to the SAME output — without this, the state pin on output[0] could
+            // land on an unrelated output while the real counter continuation sits
+            // elsewhere.
+            require(tx.outputs[0].codeScript == myCode);
+
+            // Value conservation across the continuation: no satoshis (== token
+            // value, in Radiant) are minted or burned by the counter logic.
+            require(tx.inputs.codeScriptValueSum(csh) == tx.outputs.codeScriptValueSum(csh));
+
+            // Bind the next state to currentCount + 1 using the same fixed
+            // 4-byte push convention, so the counter must advance by exactly one.
+            require(tx.outputs[0].stateScript == 0x04 + bytes4(newCount));
+        }
     }
 }

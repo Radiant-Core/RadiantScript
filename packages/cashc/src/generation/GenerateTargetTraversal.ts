@@ -47,6 +47,7 @@ import {
   UnsetNode,
 } from '../ast/AST.js';
 import AstTraversal from '../ast/AstTraversal.js';
+import { NullDataSizeError } from '../Errors.js';
 import { GlobalFunction, Class, Modifier } from '../ast/Globals.js';
 import { BinaryOperator } from '../ast/Operator.js';
 import {
@@ -410,14 +411,28 @@ export default class GenerateTargetTraversal extends AstTraversal {
         // Push the element's size (and calculate VarInt)
         this.emit(Op.OP_SIZE);
         if (el instanceof HexLiteralNode) {
-          // If the argument is a literal, we know its size
+          // If the argument is a literal, we know its size.
+          // The VarInt builder below only emits the single-byte OP_PUSHDATA1
+          // (0x4c) prefix, which encodes lengths up to 255. Larger chunks need
+          // OP_PUSHDATA2 (0x4d) + a 2-byte length, which this builder does not
+          // construct — reject them at compile time instead of emitting a
+          // silently malformed push.
+          if (el.value.byteLength > 255) {
+            throw new NullDataSizeError(el, el.value.byteLength);
+          }
           if (el.value.byteLength > 75) {
             this.emit(hexToBin('4c'));
             this.emit(Op.OP_SWAP);
             this.emit(Op.OP_CAT);
           }
         } else {
-          // If the argument is not a literal, the script needs to check size
+          // If the argument is not a literal, the script needs to check size.
+          // NOTE: this only handles the OP_PUSHDATA1 (0x4c) case for sizes
+          // 76..255. Dynamic nulldata chunks larger than 255 bytes would need an
+          // OP_PUSHDATA2 (0x4d) + 2-byte length prefix, which is not constructed
+          // here, so dynamic nulldata elements must be <= 255 bytes. Since the
+          // runtime size is unknown at compile time this limit cannot be checked
+          // statically.
           this.emit(Op.OP_DUP);
           this.emit(encodeInt(75));
           this.emit(Op.OP_GREATERTHAN);
@@ -460,7 +475,13 @@ export default class GenerateTargetTraversal extends AstTraversal {
   visitBinaryOp(node: BinaryOpNode): Node {
     node.left = this.visit(node.left);
     node.right = this.visit(node.right);
-    const isNumeric = resultingType(node.left.type, node.right.type) === PrimitiveType.INT;
+    // BOOL is treated as numeric so that ==/!= lower to OP_NUMEQUAL / OP_NUMNOTEQUAL
+    // rather than the bytewise OP_EQUAL. This makes non-canonical bool encodings
+    // (e.g. 0x01 vs 0x02, both truthy) compare equal. The typechecker rejects
+    // arithmetic (+,-,*,/,%) on bool operands, so the numeric branch's other
+    // remappings in compileBinaryOp are unreachable for BOOL.
+    const resType = resultingType(node.left.type, node.right.type);
+    const isNumeric = resType === PrimitiveType.INT || resType === PrimitiveType.BOOL;
     this.emit(compileBinaryOp(node.operator, isNumeric));
     this.popFromStack(2);
     this.pushToStack('(value)');

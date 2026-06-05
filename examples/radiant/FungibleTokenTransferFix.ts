@@ -20,7 +20,7 @@ import { hexToBin, binToHex } from '@bitauth/libauth';
  * pkh in its state section, otherwise the new owner can never sign.
  */
 
-async function main() {
+async function main(): Promise<void> {
   // Compile the contract
   const artifact = compileFile('./FungibleToken.rxd', { debug: true });
 
@@ -29,14 +29,14 @@ async function main() {
 
   // Setup keys
   const currentOwnerPrivKey = PrivateKey.fromWIF(
-    process.env.CURRENT_OWNER_WIF || 'your-current-owner-wif'
+    process.env.CURRENT_OWNER_WIF || 'your-current-owner-wif',
   );
   const currentOwnerPubKey = currentOwnerPrivKey.toPublicKey();
   const currentOwnerPk = currentOwnerPubKey.toBuffer();
 
   // NEW OWNER keys (the recipient)
   const newOwnerPrivKey = PrivateKey.fromWIF(
-    process.env.NEW_OWNER_WIF || 'your-new-owner-wif'
+    process.env.NEW_OWNER_WIF || 'your-new-owner-wif',
   );
   const newOwnerPubKey = newOwnerPrivKey.toPublicKey();
   const newOwnerPk = newOwnerPubKey.toBuffer();
@@ -141,7 +141,7 @@ export async function transferStatefulContract(
   currentOwnerPrivKey: any,
   currentOwnerPubKey: any,
   newOwnerPubKey: any,
-  utxo: { txid: string; vout: number; satoshis: number }
+  utxo: { txid: string; vout: number; satoshis: number },
 ): Promise<string> {
   // Get code script
   const codeScript = hexToBin(contract.getRedeemScriptHex());

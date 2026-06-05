@@ -1,5 +1,6 @@
 import { Utxo, Network } from '../interfaces.js';
 import NetworkProvider from './NetworkProvider.js';
+import { validateUtxo } from '../utils.js';
 
 export default class BitboxNetworkProvider implements NetworkProvider {
   constructor(
@@ -9,7 +10,13 @@ export default class BitboxNetworkProvider implements NetworkProvider {
 
   async getUtxos(address: string): Promise<Utxo[]> {
     const { utxos } = await this.bitbox.Address.utxo(address);
-    return utxos;
+    // Providers are untrusted — normalise to the Utxo shape and validate each
+    // one before returning it (M-4).
+    return utxos.map((utxo) => validateUtxo({
+      txid: utxo.txid,
+      vout: utxo.vout,
+      satoshis: utxo.satoshis,
+    }));
   }
 
   async getBlockHeight(): Promise<number> {

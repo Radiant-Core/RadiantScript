@@ -29,6 +29,7 @@ import {
   VERSION_SIZE,
   LOCKTIME_SIZE,
   DUST_LIMIT,
+  MAX_SAFE_SATOSHIS,
 } from './constants.js';
 import {
   OutputSatoshisTooSmallError,
@@ -69,6 +70,39 @@ export function validateRecipient(recipient: Recipient): void {
       throw new Error(`Invalid recipient address "${recipient.to}": ${decoded}`);
     }
   }
+}
+
+/**
+ * Validate a UTXO returned by a network provider before it is trusted as a
+ * transaction input (M-4). Providers are untrusted: a malformed or malicious
+ * response (bad txid, negative vout, non-integer/negative/overflow satoshis)
+ * must be rejected here rather than surfacing as a downstream BigInt() throw or
+ * — worse — flowing unverified into a sighash preimage (see H-2).
+ *
+ * Kept deliberately defensive but not overzealous so valid mainnet UTXOs pass.
+ *
+ * @throws If any field is malformed.
+ */
+export function validateUtxo<T extends Utxo>(utxo: T): T {
+  if (typeof utxo.txid !== 'string' || !/^[0-9a-f]{64}$/.test(utxo.txid)) {
+    throw new Error(`Invalid UTXO: txid must be 64 lowercase hex chars, got "${utxo.txid}"`);
+  }
+  if (typeof utxo.vout !== 'number' || !Number.isInteger(utxo.vout) || utxo.vout < 0) {
+    throw new Error(`Invalid UTXO ${utxo.txid}: vout must be a non-negative integer, got ${utxo.vout}`);
+  }
+  // satoshis arrives as a JS number; cap at MAX_SAFE_SATOSHIS (uint64 max) but
+  // also require integer precision so we never carry a lossy value forward.
+  if (
+    typeof utxo.satoshis !== 'number'
+    || !Number.isInteger(utxo.satoshis)
+    || utxo.satoshis < 0
+    || BigInt(utxo.satoshis) > MAX_SAFE_SATOSHIS
+  ) {
+    throw new Error(
+      `Invalid UTXO ${utxo.txid}: satoshis must be an integer in [0, ${MAX_SAFE_SATOSHIS}], got ${utxo.satoshis}`,
+    );
+  }
+  return utxo;
 }
 
 // ////////// SIZE CALCULATIONS ///////////////////////////////////////////////

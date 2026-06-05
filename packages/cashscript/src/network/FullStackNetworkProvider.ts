@@ -1,5 +1,6 @@
 import { Utxo, Network } from '../interfaces.js';
 import NetworkProvider from './NetworkProvider.js';
+import { validateUtxo } from '../utils.js';
 
 export default class FullStackNetworkProvider implements NetworkProvider {
   /**
@@ -18,7 +19,8 @@ export default class FullStackNetworkProvider implements NetworkProvider {
   async getUtxos(address: string): Promise<Utxo[]> {
     const result = await this.bchjs.Electrumx.utxo(address);
 
-    const utxos = (result.utxos ?? []).map((utxo: ElectrumUtxo) => ({
+    // Providers are untrusted — validate each UTXO before returning it (M-4).
+    const utxos = (result.utxos ?? []).map((utxo: ElectrumUtxo) => validateUtxo({
       txid: utxo.tx_hash,
       vout: utxo.tx_pos,
       satoshis: utxo.value,

@@ -843,6 +843,15 @@ export const fixtures: Fixture[] = [
                   ),
                 ),
               ]),
+              new BlockNode([
+                new RequireNode(
+                  new BinaryOpNode(
+                    new IdentifierNode('changeAmount'),
+                    BinaryOperator.LT,
+                    new IdentifierNode('minerFee'),
+                  ),
+                ),
+              ]),
             ),
           ]),
         )],

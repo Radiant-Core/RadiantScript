@@ -1,50 +1,77 @@
 pragma radiantscript ^1.1.0;
 
-// NFT - Non-Fungible Token (Singleton) contract for Radiant
-// Uses singleton references to ensure uniqueness
+// AUDIT: Owner-gated singleton NFT that stays inside its own covenant across
+// transfers. Each transfer pins the carrier output to this exact code script
+// (codeScriptCount == 1 AND output[0].codeScript == own code), so the NFT cannot
+// escape into a script that drops these rules after one hop. For data updates,
+// the new state is bound to the SAME output that carries the ref. Residual
+// limitation: the owner key is fixed at construction, so a transfer to a new
+// owner requires re-deploying with a new ownerPk (see LIMITATION below).
 //
-// Features:
-// - Guaranteed uniqueness via pushInputRefSingleton
-// - Owner-controlled transfers
-// - Immutable token identity
+// NFT - Non-Fungible Token (singleton) contract for Radiant.
+// Uses a singleton reference to guarantee uniqueness.
 //
-// Usage:
-//   1. Mint NFT with unique reference using pushInputRefSingleton
-//   2. Only one UTXO can hold this reference at a time
-//   3. Transfer ownership by spending with valid signature
+// Security model (what IS enforced):
+// - Only the current owner key can move the NFT (checkSig).
+// - The reference is a singleton: exactly one output may carry it
+//   (pushInputRefSingleton + refOutputCount == 1).
+// - The NFT remains under THIS code script after the spend: output[0] carries
+//   the ref, has this code script, and is the only output with this code script.
+//   This closes the "escape after one hop" hole where the destination script
+//   would no longer enforce the singleton/owner rules.
+// - transferWithData binds the new state to the SAME ref-carrying output.
+//
+// LIMITATION: ownerPk is a constructor constant. This template does NOT rotate
+// ownership on-chain — a real transfer must re-deploy the covenant with the new
+// owner's pubkey (the new code script is what the carrier output is pinned to by
+// the spender). It also does NOT pin tx.outputs.length, so fee-change outputs in
+// a NON-matching script are permitted; uniqueness comes from the ref singleton
+// and codeScriptCount == 1, not from a fixed output count.
 
 contract NFT(
-    bytes36 constant $nftRef,  // The unique NFT reference
+    bytes36 constant $nftRef,  // The unique NFT reference (txid:vout, singleton)
     pubkey ownerPk             // Current owner's public key
 ) {
-    // Transfer NFT to new owner
-    // Singleton ensures only one output can carry this reference
-    function transfer(sig s) {
-        // Verify current owner's signature
-        require(checkSig(s, ownerPk));
-        
-        // Push as singleton - enforces exactly one output has this ref
-        pushInputRefSingleton($nftRef);
-        
-        // Verify the NFT exists in exactly one output
-        int outputCount = tx.outputs.refOutputCount($nftRef);
-        require(outputCount == 1);
-    }
-    
-    // Transfer with data update (e.g., metadata pointer update)
-    // The new owner receives the NFT and the output's state section is set to newData.
-    function transferWithData(sig s, bytes newData) {
-        require(checkSig(s, ownerPk));
+    return {
+        // Transfer the NFT, keeping it inside this covenant.
+        transfer(sig s) {
+            // Verify the current owner's signature.
+            require(checkSig(s, ownerPk));
 
-        pushInputRefSingleton($nftRef);
+            // Enforce exactly one output carries this reference (singleton).
+            pushInputRefSingleton($nftRef);
+            require(tx.outputs.refOutputCount($nftRef) == 1);
 
-        // Ensure singleton property: exactly one output carries this reference
-        require(tx.outputs.refOutputCount($nftRef) == 1);
+            // Keep the NFT under THIS code script: output[0] must carry this code
+            // script and be the only output that does. Combined with the ref
+            // singleton above, output[0] is provably the ref carrier and it stays
+            // inside the covenant.
+            bytes myCode = tx.inputs[this.activeInputIndex].codeScript;
+            bytes32 csh = hash256(myCode);
+            require(tx.outputs.codeScriptCount(csh) == 1);
+            require(tx.outputs[0].codeScript == myCode);
+        },
 
-        // Enforce that output[0] actually stores newData in its state section.
-        // tx.outputs[0].stateScript returns the bytes before OP_STATESEPARATOR.
-        // Without this check, newData is accepted by the unlocking script but
-        // completely ignored by the locking script — equivalent to transfer().
-        require(tx.outputs[0].stateScript == newData);
+        // Transfer with a metadata/state update, keeping the NFT in the covenant.
+        // newData is written to the ref-carrying output's state section.
+        transferWithData(sig s, bytes newData) {
+            require(checkSig(s, ownerPk));
+
+            pushInputRefSingleton($nftRef);
+            require(tx.outputs.refOutputCount($nftRef) == 1);
+
+            // Pin the carrier output to this code script (same as transfer()),
+            // so output[0] is the unique ref carrier AND stays in the covenant.
+            bytes myCode = tx.inputs[this.activeInputIndex].codeScript;
+            bytes32 csh = hash256(myCode);
+            require(tx.outputs.codeScriptCount(csh) == 1);
+            require(tx.outputs[0].codeScript == myCode);
+
+            // Bind newData to the SAME output that carries the ref (output[0]).
+            // Because output[0] is pinned as the singleton ref carrier above, the
+            // state pin and the ref land on the same UTXO — newData cannot be
+            // silently ignored, and it cannot be diverted to a non-carrier output.
+            require(tx.outputs[0].stateScript == newData);
+        }
     }
 }

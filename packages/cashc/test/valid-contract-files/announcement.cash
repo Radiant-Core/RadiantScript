@@ -24,6 +24,8 @@ contract Announcement() {
             if (changeAmount >= minerFee) {
                 require(tx.outputs[1].lockingBytecode == tx.inputs[this.activeInputIndex].lockingBytecode);
                 require(tx.outputs[1].value == changeAmount);
+            } else {
+                require(changeAmount < minerFee);
             }
         }
     }

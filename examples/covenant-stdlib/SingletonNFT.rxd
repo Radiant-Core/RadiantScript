@@ -1,0 +1,119 @@
+pragma radiantscript ^1.1.0;
+
+// ============================================================================
+// SingletonNFT — GOLD-STANDARD reference covenant (covenant-stdlib)
+// Archetype: singleton ref carried forward, on-chain owner rotation, code-script
+// continuity pinned, next-state bound.
+// ============================================================================
+//
+// SECURITY MODEL
+// --------------
+// A non-fungible singleton: exactly one UTXO in existence may carry $nftRef. The
+// current owner is NOT a constructor constant — it lives in the UTXO's state as a
+// 20-byte pubkey-hash. This makes ownership transferable ON-CHAIN (no re-deploy),
+// improving on the fixed-key NFT template: the spender names the new owner pkh and
+// the covenant binds it into the continuation output's state.
+//
+// Authorisation alone is NOT a constraint (checklist #7): a checkSig that does not
+// also pin the outputs lets the NFT walk out of the covenant. Every spend here
+// therefore reconstructs the EXPECTED carrier output and asserts equality.
+//
+// STATE LAYOUT (STRICT): 0x14 <20-byte owner pkh>
+//   - 0x14 is the script push opcode for a 20-byte data push.
+//   - The state is asserted to be EXACTLY this 21-byte shape before the pkh is
+//     read, so a truncated/oversized state cannot spoof a different owner.
+//
+// INVARIANTS ENFORCED (see ../README.md for the WHY of each number)
+//   #1 Output-set bound .... require(tx.outputs.length == 1)  (carrier only;
+//                            fee is paid from a SEPARATE plain input, see NOTE)
+//   #2 Value conservation .. codeScriptValueSum(in) == codeScriptValueSum(out)
+//   #3 Recipient/script pin  outputs[0].codeScript == this code script
+//   #4 Covenant continuity   codeScriptCount(csh) == 1  (exactly one carrier)
+//   #5 State transition ..... outputs[0].stateScript == 0x14 + newOwnerPkh
+//   #6 Ref pinning .......... refOutputCount($nftRef) == 1 stitched to outputs[0]
+//                            via outputs[0].codeScript pin + codeScriptCount == 1
+//   #7 Auth is not enough ... checkSig is paired with ALL of the above
+//
+// LIMITATION (genuine opcode limits, not faked):
+//   - There is no opcode proving "output[i] carries ref X". We stitch the ref
+//     singleton (refOutputCount == 1) to outputs[0] through the code-script pin
+//     (codeScriptCount == 1 AND outputs[0].codeScript == own code): the unique
+//     ref carrier and the unique code carrier are forced to be the same output,
+//     output[0]. This is the canonical aggregate-vs-pinned-output stitch.
+//   - tx.outputs.length is pinned to 1, so the carrier output must pay its own
+//     dust and the miner fee is funded by a separate, unconstrained fee input
+//     (whose change, if any, is a DIFFERENT input's concern, not modelled here).
+//     A variant that allows a fee-change output would relax #1 to `>= 1` and add
+//     `codeScriptCount == 1` as the singleton guarantee — that variant is shown
+//     in StatefulCounter.rxd which intentionally does NOT pin length.
+
+contract SingletonNFT(
+    bytes36 constant $nftRef   // The unique NFT reference (txid:vout, singleton)
+) {
+    return {
+        // Transfer the singleton to a new owner, keeping it in this covenant.
+        // newOwnerPkh becomes the owner embedded in the continuation state.
+        transfer(pubkey ownerPk, sig s, bytes20 newOwnerPkh) {
+            // --- Authenticate the CURRENT owner from on-chain state ---
+            // Assert the exact 0x14 + 20-byte shape BEFORE reading the pkh, so a
+            // truncation-spoofed state cannot impersonate another owner.
+            bytes state = tx.inputs[this.activeInputIndex].stateScript;
+            require(state.length == 21);
+            require(state.split(1)[0] == 0x14);
+            bytes20 ownerPkh = bytes20(state.split(1)[1]);
+            require(hash160(ownerPk) == ownerPkh);
+            require(checkSig(s, ownerPk));
+
+            // --- Singleton ref (#6) ---
+            pushInputRefSingleton($nftRef);
+            require(tx.outputs.refOutputCount($nftRef) == 1);
+
+            // --- Output-set bound (#1): exactly one output, the carrier ---
+            require(tx.outputs.length == 1);
+
+            // --- Covenant continuity (#4) + carrier pin (#3) ---
+            // Stitch the unique ref carrier to output[0] through the code script:
+            // exactly one output has this code script AND it is output[0]. Combined
+            // with refOutputCount == 1, output[0] is provably the ref carrier and
+            // stays inside the covenant (cannot escape after one hop).
+            bytes myCode = tx.inputs[this.activeInputIndex].codeScript;
+            bytes32 csh = hash256(myCode);
+            require(tx.outputs.codeScriptCount(csh) == 1);
+            require(tx.outputs[0].codeScript == myCode);
+
+            // --- Value conservation (#2) ---
+            require(tx.inputs.codeScriptValueSum(csh) == tx.outputs.codeScriptValueSum(csh));
+
+            // --- State transition binding (#5): rotate ownership on-chain ---
+            // The next owner is f(spender input), not attacker-chosen *after* the
+            // fact — it is bound into the SAME output that carries the ref.
+            require(tx.outputs[0].stateScript == 0x14 + newOwnerPkh);
+        },
+
+        // Permanently melt the singleton: route its value to a provably-unspendable
+        // OP_RETURN so the ref is retired and cannot reappear. Requires the owner.
+        melt(pubkey ownerPk, sig s) {
+            bytes state = tx.inputs[this.activeInputIndex].stateScript;
+            require(state.length == 21);
+            require(state.split(1)[0] == 0x14);
+            bytes20 ownerPkh = bytes20(state.split(1)[1]);
+            require(hash160(ownerPk) == ownerPkh);
+            require(checkSig(s, ownerPk));
+
+            // Track the ref so it is consumed by this spend.
+            pushInputRef($nftRef);
+
+            // Output-set bound (#1): exactly one output, the OP_RETURN tombstone.
+            require(tx.outputs.length == 1);
+
+            // The ref MUST NOT be carried forward: zero outputs carry it.
+            require(tx.outputs.refOutputCount($nftRef) == 0);
+
+            // Provably destroy the value (and thus the singleton) by sending it to
+            // a standard nulldata output. No carrier survives, so the singleton is
+            // gone for good.
+            bytes nulldata = new LockingBytecodeNullData([0x00]);
+            require(tx.outputs[0].lockingBytecode == nulldata);
+        }
+    }
+}

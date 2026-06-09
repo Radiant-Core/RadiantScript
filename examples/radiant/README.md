@@ -1,5 +1,13 @@
 # Radiant Example Contracts
 
+> ## ➡️ Looking for the canonical, audited covenants?
+>
+> These files are the **teaching templates** the gold-standard set was promoted
+> from. For the **canonical, over-constrained reference covenants** plus the full
+> covenant-authoring guide (the invariant checklist, the build-expected-output
+> idiom, the aggregate-vs-pinned-output trap), see **[`../covenant-stdlib/`](../covenant-stdlib/README.md)**.
+> Copy from there, not from here.
+
 > ## ⚠️ TEACHING TEMPLATES — NOT PRODUCTION-READY
 >
 > These contracts exist to **demonstrate** Radiant's reference tokens, native

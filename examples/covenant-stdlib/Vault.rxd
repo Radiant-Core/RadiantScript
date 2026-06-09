@@ -1,0 +1,153 @@
+pragma radiantscript ^1.1.0;
+
+// ============================================================================
+// Vault — GOLD-STANDARD reference covenant (covenant-stdlib)
+// Archetype: m-of-n multisig with recipient PIN + change-back-to-vault and a
+// BOUNDED output set (not just value floors).
+// ============================================================================
+//
+// SECURITY MODEL
+// --------------
+// A 2-of-3 vault that pays exactly ONE fixed recipient and returns all change to
+// itself. This is the canonical "build the expected output then assert equality"
+// idiom: the recipient locking script and the vault's own locking script are
+// reconstructed in-script and compared for equality — the quorum cannot redirect
+// funds to an arbitrary address, only approve/decline the one allowed payout.
+//
+// Authorisation alone is NOT a constraint (checklist #7). A bare 2-of-3 checkMultiSig
+// with no output constraints lets a colluding quorum send funds ANYWHERE. The
+// previous "spendWithMinOutput" only floored the value; here we PIN the whole
+// output set so there is no unconstrained tail.
+//
+// recipientPkh and minAmount are constructor constants. Making them function
+// arguments would let a quorum pass an arbitrary recipient or minAmount = 0,
+// defeating the entire constraint.
+//
+// INVARIANTS ENFORCED
+//   #1 Output-set bound .... pay(): tx.inputs.length == 1 (exactly one vault UTXO)
+//                            AND tx.outputs.length == 2 (recipient + change). EVERY
+//                            output is pinned; there is no unconstrained tail and no
+//                            co-spendable sibling vault input (see AUDIT).
+//                            emergencyRecover(): tx.outputs.length == 1, pinned.
+//   #2 Value conservation .. inputValue == recipient.value + change.value (+ fee).
+//                            The fee is an EXPLICIT spender argument, bounded to a
+//                            sane ceiling, so value is fully accounted. Because
+//                            exactly one vault input is consumed, inputValue (the
+//                            active input's value) IS the whole vault value spent.
+//   #3 Recipient/script pin  outputs[0].lockingBytecode == P2PKH(recipientPkh)
+//                            outputs[1].lockingBytecode == this vault's own script
+//                            emergencyRecover: outputs[0] == P2PKH(recoveryPkh)
+//   #7 Auth is not enough ... checkMultiSig / checkSig is paired with the full
+//                            output pin (recovery now pins its destination too)
+//
+// AUDIT 2026-06-09 (HIGH — co-spend fee-burn, FIXED):
+//   ROOT CAUSE (general): a covenant that reasons about the ACTIVE input's value
+//   but neither bounds tx.inputs.length NOR conserves over a tx-wide aggregate is
+//   exploitable whenever TWO identical vault UTXOs (same code/params → same script)
+//   are co-spent — each input evaluates independently against the SHARED outputs.
+//   ATTACK (before fix): pay() conserved tx.inputs[activeInputIndex].value against
+//   out[0]+out[1]+fee, with NO inputs.length bound. Two equal-value vault UTXOs (V
+//   each) were co-spent; the two shared outputs summed to V, so the per-active-input
+//   conservation passed for BOTH inputs, but tx-in was 2V and tx-out was V+fee → a
+//   whole vault UTXO (V) was burned to the miner fee and a colluding miner recovered
+//   it. (The fee<=100000 ceiling did NOT help: the implied miner fee is V, set by
+//   the value gap, not by the `fee` argument.)
+//   FIX: require(tx.inputs.length == 1) in pay(). The two-vault merge tx now has 2
+//   inputs != 1 and is REJECTED; a vault spend consumes exactly one vault UTXO.
+//
+// AUDIT 2026-06-09 (recovery hardening): emergencyRecover() previously had NO output
+//   constraint, so after the timelock a SINGLE compromised key could sweep the vault
+//   anywhere — an effective 1-of-3 spend-anywhere. It now pins the sweep to a
+//   constructor-fixed cold address (recoveryPkh); a lone stolen key can only push
+//   funds to the owner's offline backup, never to an attacker script.
+//
+// LIMITATION (genuine design limits):
+//   - The recipient is FIXED at construction. This is a "pay this one party, change
+//     back to us" vault, not a general spend-anywhere multisig. A general vault
+//     CANNOT bind the recipient without accepting it as a (spoofable) argument —
+//     that is a fundamental tradeoff, not a missing opcode.
+//   - This template intentionally consumes ONE vault input per spend (inputs.length
+//     == 1); the fee is funded from within that input. If you genuinely need to
+//     batch-merge several vault UTXOs in one tx, do NOT relax inputs.length blindly
+//     — instead conserve over a tx-wide aggregate (codeScriptValueSum over the vault
+//     code script == out0 + out1 + fee, with codeScriptCount == 1 for the change),
+//     so the merged value is accounted tx-wide and cannot leak to fees.
+//   - emergencyRecover() is a deliberate, timelocked escape hatch. It is now pinned
+//     to recoveryPkh (not spend-anywhere); if you do not want unilateral recovery at
+//     all, delete this function.
+
+contract Vault(
+    pubkey pk1,
+    pubkey pk2,
+    pubkey pk3,
+    bytes20 constant recipientPkh,  // Fixed payout recipient (pkh), set at creation
+    int constant minAmount,         // Fixed minimum payout, set at creation
+    bytes20 constant recoveryPkh    // Fixed cold-recovery address (pkh), set at creation
+) {
+    return {
+        // 2-of-3 payout to the fixed recipient, with ALL change returned to the
+        // vault. fee is an explicit, bounded spender argument so value is fully
+        // conserved: input == recipient + change + fee.
+        pay(sig s1, sig s2, int fee) {
+            require(checkMultiSig([s1, s2], [pk1, pk2, pk3]));
+
+            // --- Single-vault-input bound (#1, anti-merge): EXACTLY ONE vault UTXO ---
+            // This path reasons about the ACTIVE input's value
+            // (tx.inputs[this.activeInputIndex].value) and conserves it against the
+            // two outputs + fee. That conservation is per-active-input, NOT tx-wide.
+            // WITHOUT this bound, two equal-value vault UTXOs (V each, identical
+            // code/params → identical script) can be CO-SPENT: each input evaluates
+            // independently against the SAME two outputs (which sum to V), the active
+            // input's `inputValue == out0 + out1 + fee` holds for BOTH, but the tx
+            // takes in 2V and pays out V + fee → the second whole vault UTXO (V) is
+            // silently routed to the MINER FEE and a colluding miner recovers it.
+            // Pinning tx.inputs.length == 1 makes the merge tx invalid; a vault spend
+            // consumes exactly one vault UTXO and the miner fee comes from within it.
+            require(tx.inputs.length == 1);
+
+            // --- Output-set bound (#1): exactly recipient + change ---
+            require(tx.outputs.length == 2);
+
+            // --- Build the EXPECTED outputs, then assert equality (#3) ---
+            // output[0]: the fixed recipient P2PKH.
+            bytes25 recipientLock = new LockingBytecodeP2PKH(recipientPkh);
+            require(tx.outputs[0].lockingBytecode == recipientLock);
+            require(tx.outputs[0].value >= minAmount);
+            require(tx.outputs[0].value >= 546);  // dust floor
+
+            // output[1]: change MUST return to the vault's own locking script, so a
+            // quorum cannot skim change to an outside script.
+            bytes myLock = tx.inputs[this.activeInputIndex].lockingBytecode;
+            require(tx.outputs[1].lockingBytecode == myLock);
+            require(tx.outputs[1].value >= 546);  // dust floor
+
+            // --- Value conservation (#2): every satoshi accounted for ---
+            // fee is bounded so a malicious quorum cannot burn the vault to fees.
+            require(fee > 0);
+            require(fee <= 100000);
+            int inputValue = tx.inputs[this.activeInputIndex].value;
+            require(tx.outputs[0].value + tx.outputs[1].value + fee == inputValue);
+        },
+
+        // Timelocked recovery escape hatch: after ~1 year of vault inactivity any
+        // single authorised key may sweep the vault — but ONLY to the pre-committed
+        // cold-recovery address (recoveryPkh), NOT anywhere. See AUDIT below.
+        emergencyRecover(sig s, pubkey pk) {
+            require(tx.age >= 52560);  // ~1 year in blocks
+            require(pk == pk1 || pk == pk2 || pk == pk3);
+            require(checkSig(s, pk));
+
+            // --- Recovery destination PINNED (#1, #3): one output to recoveryPkh ---
+            // Previously this path had NO output constraint, so a SINGLE compromised
+            // key could redirect the entire vault anywhere after the timelock —
+            // degrading the 2-of-3 to an effective 1-of-3 spend-anywhere. We now pin
+            // the sweep to a constructor-fixed cold address: a lone stolen key can
+            // only ever push funds to recoveryPkh (the offline backup the vault owner
+            // controls), never to an attacker's script. recoveryPkh is a constructor
+            // constant — making it an argument would re-open the spoof.
+            require(tx.outputs.length == 1);
+            bytes25 recoveryLock = new LockingBytecodeP2PKH(recoveryPkh);
+            require(tx.outputs[0].lockingBytecode == recoveryLock);
+        }
+    }
+}

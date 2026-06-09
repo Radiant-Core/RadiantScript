@@ -1,0 +1,215 @@
+pragma radiantscript ^1.1.0;
+
+// ============================================================================
+// FungibleToken — GOLD-STANDARD reference covenant (covenant-stdlib)
+// Archetype: supply conservation via codeScriptValueSum, carrier count tied to
+// refOutputCount, provable burn to OP_RETURN.
+// ============================================================================
+//
+// SECURITY MODEL
+// --------------
+// A P2PKH-style fungible token keyed by $tokenRef. In Radiant a ref carrier's
+// "token amount" IS its satoshi value (checklist: the satoshi==amount semantic);
+// codeScriptValueSum / refValueSum sum that satoshi value across in/outputs.
+//
+// Ownership is per-UTXO, embedded in state as a 20-byte pubkey-hash, so tokens
+// circulate without a central key. The owner parse is hardened (exact 0x14 +
+// 20-byte shape asserted before split) to block a truncation-spoofed owner.
+//
+// The defining property of a fungible token is that NO spend may mint or burn
+// supply except the explicit burn() path, and that every carrier stays inside
+// THIS code script so the rules cannot be dropped after one hop.
+//
+// STATE LAYOUT (STRICT): 0x14 <20-byte holder pkh>
+//
+// INVARIANTS ENFORCED
+//   #1 Output-set bound .... transfer() (single-recipient, the DEFAULT) pins
+//                            tx.outputs.length == 1. burn() pins == 2 (one
+//                            continuation + the OP_RETURN). transferMulti() (opt-in
+//                            fan-out) intentionally does NOT bound length — see
+//                            LIMITATION; its safety comes from #2+#3+#4 in aggregate.
+//   #2 Value conservation .. transfer/transferMulti: codeScriptValueSum(in) == out
+//                            burn:     in - burnAmount == out  (exact)
+//   #3 Recipient/script pin  every $tokenRef carrier uses THIS code script
+//   #4 Covenant continuity   codeScriptCount(csh) == refOutputCount($tokenRef)
+//                            (every ref carrier is a covenant carrier; the token
+//                            cannot escape into a foreign script)
+//   #5 State transition ..... transfer() (single-recipient) BINDS the carrier's next
+//                            state in-script: outputs[0].stateScript == 0x14<newPkh>,
+//                            so it cannot forward a malformed (bricking) state. (N/A
+//                            to transferMulti — see LIMITATION.)
+//   #6 Ref pinning .......... transfer(): refOutputCount == 1 stitched to outputs[0]
+//                            via codeScriptCount == 1 + outputs[0].codeScript pin.
+//                            burn(): the destroyed value is pinned to a FIXED
+//                            OP_RETURN output (outputs[1]) of exactly burnAmount.
+//   #7 Auth is not enough ... checkSig is paired with conservation + script pin
+//
+// AUDIT 2026-06-09 (MEDIUM — malformed-continuation brick, FIXED for the default):
+//   The previous single transfer() authenticated the holder from INPUT state but
+//   constrained NO output STATE, so a builder that emitted a malformed next-owner
+//   state (wrong length / push byte) PERMANENTLY bricked the carrier UTXO: every
+//   future transfer()/burn() owner-parse would reject it. This is self-grief, not
+//   theft (the sender must sign), but a gold-standard reference should enforce its
+//   own state invariant on the value it forwards. FIX: the DEFAULT transfer() is now
+//   single-recipient — it pins tx.outputs.length == 1, stitches the ref/code carrier
+//   to output[0], and BINDS outputs[0].stateScript == 0x14<newOwnerPkh> in-script, so
+//   a well-formed next owner is guaranteed. The open fan-out moved to transferMulti()
+//   with an explicit LIMITATION that the builder owns state well-formedness there.
+//
+// LIMITATION (genuine opcode limits):
+//   - There is no opcode proving "output[i] carries ref X with amount Y". So for
+//     a MULTI-recipient transfer (transferMulti) we cannot bound the number of token
+//     outputs to a fixed N without knowing the split in advance, and we likewise
+//     CANNOT bind each carrier's next-owner STATE in-script. transferMulti()
+//     therefore leaves tx.outputs.length open and relies on the AGGREGATE identity
+//     codeScriptCount == refOutputCount + codeScriptValueSum(in) == out. This is
+//     sound for VALUE (no value escapes the code script, no carrier escapes it), but
+//     the BUILDER is responsible for emitting a well-formed 0x14<pkh> state on every
+//     carrier; a malformed one bricks that UTXO (self-grief, no theft). Prefer the
+//     single-recipient transfer() unless you genuinely need the fan-out.
+//   - burn() pins the OP_RETURN at a FIXED index (output[1]); the transaction
+//     builder MUST produce that layout. Conservation over the code script ALONE
+//     does not prove destruction — value could be diverted to a spendable script;
+//     the explicit nulldata pin is what proves the supply is gone.
+
+contract FungibleToken(
+    bytes36 constant $tokenRef   // The unique token reference (txid:vout)
+) {
+    return {
+        // Transfer the WHOLE balance of this carrier to a SINGLE new holder, keeping
+        // it inside this code script. This is the gold-standard default: it enforces
+        // its OWN next-owner state invariant, so a malformed continuation state can
+        // never brick the value it forwards (see AUDIT). For a fan-out split to many
+        // holders use transferMulti() and read its LIMITATION.
+        //
+        // Required output layout (STRICT):
+        //   output[0] : same-code carrier, state 0x14<newOwnerPkh>, full input value
+        transfer(pubkey senderPk, sig s, bytes20 newOwnerPkh) {
+            // --- Authenticate the holder from on-chain state (hardened parse) ---
+            bytes state = tx.inputs[this.activeInputIndex].stateScript;
+            require(state.length == 21);
+            require(state.split(1)[0] == 0x14);
+            bytes20 embeddedPkh = bytes20(state.split(1)[1]);
+            require(hash160(senderPk) == embeddedPkh);
+            require(checkSig(s, senderPk));
+
+            // Track the token reference.
+            pushInputRef($tokenRef);
+
+            // --- Output-set bound (#1): exactly one continuation carrier ---
+            // Fees come from a separate plain input (the singleton-path convention
+            // used across this stdlib); the carrier forwards its full token value.
+            require(tx.outputs.length == 1);
+
+            // --- Covenant continuity + carrier pin (#3, #4) ---
+            // Exactly one output carries the ref AND it is the code carrier AND it is
+            // output[0] — the canonical aggregate-vs-pinned-output stitch.
+            bytes myCode = tx.inputs[this.activeInputIndex].codeScript;
+            bytes32 csh = hash256(myCode);
+            require(tx.outputs.refOutputCount($tokenRef) == 1);
+            require(tx.outputs.codeScriptCount(csh) == 1);
+            require(tx.outputs[0].codeScript == myCode);
+
+            // --- Value (== token amount) conservation (#2) ---
+            require(tx.inputs.codeScriptValueSum(csh) == tx.outputs.codeScriptValueSum(csh));
+
+            // --- State transition binding (#5): well-formed next owner ---
+            // Build the next holder's state IN-SCRIPT and pin it, so the continuation
+            // is ALWAYS a valid 0x14<pkh> owner state. This is the fix for the
+            // brick-on-malformed-state grief: the covenant enforces its own state
+            // invariant on the value it forwards rather than trusting the builder.
+            require(tx.outputs[0].stateScript == 0x14 + newOwnerPkh);
+        },
+
+        // Multi-recipient fan-out: split the balance across MANY same-code carriers
+        // in one tx. This path CANNOT pin a fixed output count (the split is only
+        // known to the builder), so its safety rests entirely on the AGGREGATE
+        // identity: value is conserved over the code script and every ref carrier is
+        // a code carrier (no value/carrier escapes a foreign, rule-dropping script).
+        //
+        // LIMITATION (read before using): there is no opcode proving "output[i]
+        // carries ref X with amount Y", so this path does NOT and CANNOT bind each
+        // carrier's next-owner STATE in-script. The transaction builder is therefore
+        // RESPONSIBLE for emitting a well-formed 0x14<pkh> state on EVERY carrier
+        // output. A malformed continuation state (e.g. wrong length / wrong push
+        // opcode) does NOT lose value to an attacker (the sender must sign), but it
+        // BRICKS that carrier UTXO permanently — its transfer()/burn() owner parse
+        // will reject it forever. If you do not need a fan-out, prefer transfer(),
+        // which enforces the next-owner state invariant for you.
+        transferMulti(pubkey senderPk, sig s) {
+            // --- Authenticate the holder from on-chain state (hardened parse) ---
+            bytes state = tx.inputs[this.activeInputIndex].stateScript;
+            require(state.length == 21);
+            require(state.split(1)[0] == 0x14);
+            bytes20 embeddedPkh = bytes20(state.split(1)[1]);
+            require(hash160(senderPk) == embeddedPkh);
+            require(checkSig(s, senderPk));
+
+            // Track the token reference.
+            pushInputRef($tokenRef);
+
+            // --- Covenant continuity + carrier pin (#3, #4) ---
+            // Every output that carries $tokenRef must also carry THIS code script:
+            // the carrier count equals the ref-output count, so no carrier can sit
+            // in a foreign (rule-dropping) script.
+            bytes32 csh = hash256(tx.inputs[this.activeInputIndex].codeScript);
+            // The fan-out transfer is the one sound covenant that does NOT pin a fixed
+            // output count or a specific output index: value is conserved by the
+            // code-script-keyed BALANCED IDENTITY below (codeScriptValueSum in == out),
+            // which holds for ANY number of carrier outputs, and codeScriptCount ==
+            // refOutputCount stops value escaping to a foreign script. The linter
+            // recognises these balanced aggregate identities (== with an aggregate on
+            // both sides) and does not fire aggregate-only / unconstrained-outputs here,
+            // so no suppression is needed.
+            require(tx.outputs.codeScriptCount(csh) == tx.outputs.refOutputCount($tokenRef));
+
+            // --- Value (== token amount) conservation (#2) ---
+            require(tx.inputs.codeScriptValueSum(csh) == tx.outputs.codeScriptValueSum(csh));
+        },
+
+        // Burn tokens (intentionally reduce supply). The remainder stays inside the
+        // FungibleToken script; the burned amount is provably destroyed via an
+        // OP_RETURN nulldata output.
+        //
+        // Required output layout (STRICT):
+        //   output[0] : same-code carrier holding (inputTokens - burnAmount)
+        //   output[1] : OP_RETURN nulldata carrying exactly burnAmount satoshis
+        burn(pubkey senderPk, sig s, int burnAmount) {
+            // --- Authenticate the holder (same hardened parse) ---
+            bytes state = tx.inputs[this.activeInputIndex].stateScript;
+            require(state.length == 21);
+            require(state.split(1)[0] == 0x14);
+            bytes20 embeddedPkh = bytes20(state.split(1)[1]);
+            require(hash160(senderPk) == embeddedPkh);
+            require(checkSig(s, senderPk));
+
+            pushInputRef($tokenRef);
+
+            // --- Output-set bound (#1): exactly two outputs ---
+            // Bounding the set makes the carrier (output[0]) and the tombstone
+            // (output[1]) unambiguous.
+            require(tx.outputs.length == 2);
+
+            // --- Covenant continuity (#4): the surviving carrier stays in-script ---
+            bytes32 csh = hash256(tx.inputs[this.activeInputIndex].codeScript);
+            require(tx.outputs.codeScriptCount(csh) == tx.outputs.refOutputCount($tokenRef));
+            require(tx.outputs.refOutputCount($tokenRef) == 1);
+            require(tx.outputs[0].codeScript == tx.inputs[this.activeInputIndex].codeScript);
+
+            // --- Exact supply reduction (#2) ---
+            int inputTokens = tx.inputs.codeScriptValueSum(csh);
+            int outputTokens = tx.outputs.codeScriptValueSum(csh);
+            require(burnAmount > 0);
+            require(burnAmount <= inputTokens);
+            require(inputTokens - burnAmount == outputTokens);
+
+            // --- Provable destruction (#6): pin the OP_RETURN value ---
+            // Without this, "burned" value could be diverted to an arbitrary
+            // spendable script; conservation over the code script alone does not
+            // prove destruction.
+            bytes nulldata = new LockingBytecodeNullData([0x00]);
+            require(tx.outputs[1].lockingBytecode == nulldata);
+            require(tx.outputs[1].value == burnAmount);
+        }
+    }
+}

@@ -1,0 +1,88 @@
+pragma radiantscript ^1.1.0;
+
+// ============================================================================
+// StatefulCounter — GOLD-STANDARD reference covenant (covenant-stdlib)
+// Archetype: state transition BOUND on-chain (next == current + 1), singleton
+// continuation, value conserved.
+// ============================================================================
+//
+// SECURITY MODEL
+// --------------
+// A monotonic counter that lives inside its own covenant. The current count is
+// stored in the UTXO's state script; the spender supplies `currentCount`, which is
+// AUTHENTICATED against the input's on-chain state (it cannot be forged). The next
+// state is BOUND to currentCount + 1 in the continuation output — the counter must
+// advance by exactly one and cannot be reset, skipped, or rewound.
+//
+// This is the canonical state-transition covenant (checklist #5): the next state
+// is f(current state), computed in-script, not chosen by the attacker. Pair that
+// with a singleton continuation (#4) and value conservation (#2) and the counter
+// is a faithful on-chain finite-state machine.
+//
+// STATE LAYOUT (STRICT): 0x04 <4-byte little-endian count>
+//   - 0x04 is the script push opcode for a 4-byte data push.
+//   - bytes4(n) is the fixed-width little-endian (OP_NUM2BIN) encoding of n.
+//
+// INVARIANTS ENFORCED
+//   #1 Output-set bound .... tx.outputs.length == 1 (the sole continuation). The
+//                            counter pays its own value forward; fees come from a
+//                            separate input. (The original template left length
+//                            open; this gold version pins it for a tight FSM.)
+//   #2 Value conservation .. codeScriptValueSum(in) == codeScriptValueSum(out)
+//   #3 Recipient/script pin  outputs[0].codeScript == this code script
+//   #4 Covenant continuity   codeScriptCount(csh) == 1 (exactly one continuation)
+//   #5 State transition ..... outputs[0].stateScript == 0x04 + bytes4(current + 1)
+//   #7 Auth is not enough ... checkSig is paired with the full state/continuity pin
+//
+// LIMITATION (genuine opcode limits):
+//   - Radiant has no opcode to bind an arbitrary-width minimally-encoded script
+//     number into state and read it back unambiguously. We pin a FIXED 4-byte
+//     push, so the counter is correct only for 0 <= count <= 2147483647. We add an
+//     explicit upper-bound guard (currentCount < 2147483647) so the +1 cannot
+//     overflow the 4-byte field and mis-pin/wrap. A counter that must exceed
+//     2^31-1 needs a wider fixed width and matching range checks.
+//   - tx.outputs.length is pinned to 1, so a fee-change output is NOT permitted on
+//     this path; fund the fee from a separate input. (FungibleToken.transfer shows
+//     the open-length variant where the singleton comes from codeScriptCount alone.)
+
+contract StatefulCounter(
+    pubkey ownerPk
+) function(int currentCount) {
+    // State section: reproduced so the code section can reference it; the real
+    // on-chain value is authenticated below against the input's state script.
+    int newCount = currentCount + 1;
+
+    stateSeparator;
+
+    // Code section: logic that must remain unchanged across spends.
+    return {
+        increment(sig s) {
+            require(checkSig(s, ownerPk));
+
+            // --- Range guard (see LIMITATION): keep current+1 inside the 4-byte
+            // field, so the fixed-width encoding cannot wrap. ---
+            require(currentCount >= 0);
+            require(currentCount < 2147483647);
+
+            // --- Authenticate currentCount against THIS input's on-chain state ---
+            // Without this, currentCount is an unconstrained spender input and the
+            // "+1" binding below would be meaningless.
+            require(tx.inputs[this.activeInputIndex].stateScript == 0x04 + bytes4(currentCount));
+
+            // --- Output-set bound (#1): exactly one continuation ---
+            require(tx.outputs.length == 1);
+
+            // --- Singleton continuation + carrier pin (#4, #3) ---
+            bytes myCode = tx.inputs[this.activeInputIndex].codeScript;
+            bytes32 csh = hash256(myCode);
+            require(tx.outputs.codeScriptCount(csh) == 1);
+            require(tx.outputs[0].codeScript == myCode);
+
+            // --- Value conservation (#2): no satoshis minted or burned ---
+            require(tx.inputs.codeScriptValueSum(csh) == tx.outputs.codeScriptValueSum(csh));
+
+            // --- State transition binding (#5): next == current + 1 ---
+            require(tx.outputs[0].stateScript == 0x04 + bytes4(newCount));
+        }
+    }
+}

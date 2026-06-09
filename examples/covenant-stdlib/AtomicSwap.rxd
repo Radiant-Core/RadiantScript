@@ -1,0 +1,167 @@
+pragma radiantscript ^1.1.0;
+
+// ============================================================================
+// AtomicSwap — GOLD-STANDARD reference covenant (covenant-stdlib)
+// Archetype: want-ref PINNED to the maker's specific output
+// (refValueSum($want) == outputs[0].value), offer conserved, cancel constrained.
+// ============================================================================
+//
+// SECURITY MODEL
+// --------------
+// A maker locks an offer-token behind this covenant and names a want-token + price.
+// A taker spends the covenant, supplying the want-token; the swap atomically pays
+// the want-token to the MAKER and releases the offer-token to the taker in the
+// same transaction. Either both legs settle or the transaction is invalid.
+//
+// The single hardest part of a swap covenant is proving the want-token actually
+// landed in the MAKER's output rather than "somewhere in the tx". Radiant exposes
+// refValueSum only at the TRANSACTION level (sum of carrier satoshi values across
+// all outputs) — there is NO opcode proving "output[i] carries ref X with amount Y"
+// (the satoshi==amount semantic). We close the gap by forcing the want-ref into
+// EXACTLY ONE output (refOutputCount == 1) and equating its whole sum to the
+// maker's pinned output value:
+//
+//     require(tx.outputs.refOutputCount($wantTokenRef) == 1);
+//     require(tx.outputs.refValueSum($wantTokenRef) == tx.outputs[0].value);
+//     require(tx.outputs[0].lockingBytecode == P2PKH(makerPkh));
+//
+// Conservation alone is NOT a swap (checklist #7 generalised): a covenant that only
+// asserts "want in == want out" lets the taker keep the want-token by routing it
+// back to themselves. The maker-output pin is what makes it a trade.
+//
+// INVARIANTS ENFORCED
+//   #1 Output-set bound .... executeSwap pins tx.outputs.length == 2;
+//                            cancel pins tx.outputs.length == 1 (reclaim only).
+//                            INPUT side is bounded too: refOutputCount over inputs
+//                            for $offerTokenRef == 1 (see AUDIT below) so two
+//                            identical offer covenants cannot be merged in one tx.
+//   #2 Value conservation .. offer in == offer out; want in == want out
+//   #3 Recipient/script pin  outputs[0].lockingBytecode == P2PKH(makerPkh)
+//   #6 Ref pinning .......... refOutputCount($want) == 1 stitched to outputs[0]
+//                            via refValueSum($want) == outputs[0].value
+//   #7 Auth is not enough ... taker sig is paired with the maker-output pin
+//
+// AUDIT 2026-06-09 (CRITICAL — co-spend offer-merge theft, FIXED):
+//   ROOT CAUSE (general): a covenant that reasons about per-input value/state but
+//   neither bounds tx.inputs.length NOR conserves over a tx-wide aggregate is
+//   exploitable whenever TWO identical covenant UTXOs (same code/params → same
+//   script) are co-spent — each input evaluates independently against the SHARED
+//   outputs, so a single shared payout satisfies BOTH evaluations.
+//   ATTACK (before fix): normal pushInputRef is NOT consensus-unique; two UTXOs
+//   carrying $offerTokenRef were co-spent. Outputs: out[0]=maker P2PKH value
+//   wantAmount, out[1]=taker holding OFR1+OFR2. Both legs' conservation
+//   (refValueSum offer-in == offer-out) hold for the SUM, refOutputCount(want)==1
+//   and refOutputCount(offer over OUTPUTS)==1 also hold, so each input passed —
+//   the taker took TWO offers for ONE wantAmount, stealing the second.
+//   FIX: require(tx.inputs.refOutputCount($offerTokenRef) == 1) in executeSwap (and
+//   cancel, defense-in-depth). The merge tx now counts 2 input carriers != 1 and
+//   is REJECTED; each offer must settle in its own tx with its own want payment.
+//   NOTE: the maker floor stays `outputs[0].value >= wantAmount` (NOT ==) so a
+//   taker who over-supplies the want-ref can take change; refOutputCount(want)==1
+//   + refValueSum(want)==outputs[0].value still pins the FULL want sum to the maker.
+//
+// LIMITATION (genuine opcode limits):
+//   - refValueSum is transaction-level. We over-constrain (length + per-ref
+//     refOutputCount + the maker output's value) and equate refValueSum to that
+//     single output's value. This is sound ONLY because the template forces the
+//     want-ref into exactly one output whose value equals the whole refValueSum.
+//   - The taker's CHANGE for the want-ref (if the taker over-supplies) is NOT
+//     modelled: the template assumes the maker takes the full want-ref value. If
+//     takers may over-supply, add a taker-change output and relax refOutputCount
+//     to 2 with an explicit second pin.
+//   - makerPkh is a constructor constant (set when the maker funds the covenant),
+//     so the payout recipient cannot be spoofed by the taker.
+
+contract AtomicSwap(
+    bytes36 constant $offerTokenRef,   // Token offered by the maker
+    bytes36 constant $wantTokenRef,    // Token the maker wants in return
+    int constant wantAmount,           // Agreed price (min want-token value)
+    bytes20 constant makerPkh          // Maker's pubkey-hash (payout recipient)
+) {
+    return {
+        // Taker supplies the want-token and receives the offer-token.
+        // Required outputs (STRICT):
+        //   output[0] : P2PKH(makerPkh) carrying the ENTIRE want-ref value
+        //   output[1] : the offer-token released to the taker
+        executeSwap(sig takerSig, pubkey takerPk) {
+            // Authorise the spend shape with the taker's signature.
+            require(checkSig(takerSig, takerPk));
+
+            // Track both references.
+            pushInputRef($offerTokenRef);
+            pushInputRef($wantTokenRef);
+
+            // --- Single-offer-input bound (#1, anti-merge): EXACTLY ONE input may
+            // carry the offer ref. -----------------------------------------------
+            // Normal pushInputRef is NOT consensus-unique or value-conserved — only
+            // the SET-DIFFERENCE rule (output-refs ⊆ input-refs) applies. So WITHOUT
+            // this bound, TWO covenant UTXOs carrying $offerTokenRef (identical code
+            // + params → identical script) can be CO-SPENT in one tx. Each input
+            // evaluates independently against the SAME shared outputs; the conserved
+            // sums (refValueSum offer-in == offer-out) hold for the COMBINED total,
+            // so the taker releases both offers (out[1] = OFR1+OFR2) while paying a
+            // SINGLE wantAmount in out[0] — stealing the second maker's offer.
+            // Forcing refOutputCount over INPUTS to 1 makes the two-covenant merge
+            // tx invalid (it would count 2), so each offer must be swapped in its
+            // own transaction with its own want payment.
+            require(tx.inputs.refOutputCount($offerTokenRef) == 1);
+
+            // --- Conservation (#2): neither token minted nor burned ---
+            require(tx.inputs.refValueSum($offerTokenRef) == tx.outputs.refValueSum($offerTokenRef));
+            require(tx.inputs.refValueSum($wantTokenRef) == tx.outputs.refValueSum($wantTokenRef));
+
+            // --- Output-set bound (#1): maker payout + offer release ---
+            require(tx.outputs.length == 2);
+
+            // --- Want-ref pinned to the MAKER's output (#3, #6) ---
+            // refOutputCount == 1 forces the want-ref into a single output; pinning
+            // output[0] to the maker P2PKH and equating refValueSum to its value
+            // proves output[0] IS that carrier — the want-token lands with the
+            // maker, not merely "somewhere".
+            require(tx.outputs.refOutputCount($wantTokenRef) == 1);
+            bytes25 makerLock = new LockingBytecodeP2PKH(makerPkh);
+            require(tx.outputs[0].lockingBytecode == makerLock);
+            require(tx.outputs[0].value >= wantAmount);          // price floor
+            require(tx.outputs.refValueSum($wantTokenRef) == tx.outputs[0].value);
+
+            // --- Offer-ref released to the taker in output[1] (#6) ---
+            // Exactly one output carries the offer-ref and it is output[1], so the
+            // offer-token cannot be silently re-captured by the maker output.
+            require(tx.outputs.refOutputCount($offerTokenRef) == 1);
+            bytes25 takerLock = new LockingBytecodeP2PKH(hash160(takerPk));
+            require(tx.outputs[1].lockingBytecode == takerLock);
+            require(tx.outputs.refValueSum($offerTokenRef) == tx.outputs[1].value);
+        },
+
+        // Maker cancels the offer and reclaims the offer-token to their own P2PKH.
+        // Constrained so the offer-ref is conserved and returned to the maker only.
+        cancel(sig makerSig, pubkey makerPk) {
+            // The signer must be the maker (pkh fixed at construction).
+            require(hash160(makerPk) == makerPkh);
+            require(checkSig(makerSig, makerPk));
+
+            // Track and conserve the offer ref.
+            pushInputRef($offerTokenRef);
+
+            // --- Single-offer-input bound (defense-in-depth) ---
+            // A cancel reclaims ONE offer; pin one input carrier so two identical
+            // offer covenants cannot be merged into a single reclaim (no gain here
+            // since both go to the same maker pkh, but it keeps the carrier output
+            // unambiguous and matches executeSwap's anti-merge invariant).
+            require(tx.inputs.refOutputCount($offerTokenRef) == 1);
+
+            require(tx.inputs.refValueSum($offerTokenRef) == tx.outputs.refValueSum($offerTokenRef));
+
+            // --- Output-set bound (#1): exactly the reclaim output ---
+            // Fees are funded from a separate input, mirroring the other singleton
+            // covenants here; this keeps the carrier output unambiguous (output[0]).
+            require(tx.outputs.length == 1);
+
+            // --- Return the offer ref to the maker (#3, #6) ---
+            require(tx.outputs.refOutputCount($offerTokenRef) == 1);
+            bytes25 makerLock = new LockingBytecodeP2PKH(makerPkh);
+            require(tx.outputs[0].lockingBytecode == makerLock);
+            require(tx.outputs.refValueSum($offerTokenRef) == tx.outputs[0].value);
+        }
+    }
+}

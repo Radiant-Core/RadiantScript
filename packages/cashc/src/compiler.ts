@@ -1,4 +1,4 @@
-import { Artifact, asmToBytecode, optimiseBytecode } from '@radiantscript/utils';
+import { Artifact, LintWarning, asmToBytecode, optimiseBytecode } from '@radiantscript/utils';
 import { binToHex, binToUtf8, hexToBin } from '@bitauth/libauth';
 import { ANTLRInputStream, CommonTokenStream } from 'antlr4ts';
 import fs from 'fs';
@@ -12,9 +12,19 @@ import { CashScriptParser } from './grammar/CashScriptParser.js';
 import SymbolTableTraversal from './semantic/SymbolTableTraversal.js';
 import TypeCheckTraversal from './semantic/TypeCheckTraversal.js';
 import EnsureFinalRequireTraversal from './semantic/EnsureFinalRequireTraversal.js';
+import CovenantLintTraversal from './semantic/CovenantLintTraversal.js';
+import { applySuppressions } from './semantic/LintSuppressions.js';
+import { CovenantLintError } from './Errors.js';
+
+// Covenant-lint mode:
+//   'off'   -> skip the lint pass entirely.
+//   'warn'  -> collect warnings and attach them to the artifact (default).
+//   'error' -> throw a CovenantLintError if any (un-suppressed) warning fires.
+export type CovenantLintMode = 'off' | 'warn' | 'error';
 
 export interface CompileOptions {
   debug?: boolean;
+  covenantLint?: CovenantLintMode;
 }
 
 export function compileString(code: string, options: CompileOptions = {}): Artifact {
@@ -26,6 +36,23 @@ export function compileString(code: string, options: CompileOptions = {}): Artif
   ast = ast.accept(new TypeCheckTraversal()) as Ast;
   ast = ast.accept(new EnsureFinalRequireTraversal()) as Ast;
 
+  // Heuristic covenant lint (after the final-require check so we only ever lint
+  // structurally-valid contracts). This pass NEVER mutates the AST and — in the
+  // default 'warn' mode — NEVER changes compile success: it only collects
+  // warnings. They are attached to the returned artifact rather than logged, so
+  // compileString stays side-effect-free.
+  const lintMode: CovenantLintMode = options.covenantLint ?? 'warn';
+  let warnings: LintWarning[] = [];
+  if (lintMode !== 'off') {
+    const lint = new CovenantLintTraversal();
+    ast.accept(lint);
+    warnings = applySuppressions(lint.warnings, code);
+
+    if (lintMode === 'error' && warnings.length > 0) {
+      throw new CovenantLintError(warnings);
+    }
+  }
+
   // Code generation
   const traversal = new GenerateTargetTraversal();
   traversal.debugMode = options.debug ?? false;
@@ -36,7 +63,18 @@ export function compileString(code: string, options: CompileOptions = {}): Artif
   // Bytecode optimisation
   const optimisedBytecode = optimiseBytecode(bytecode);
 
-  return generateArtifact(ast, optimisedBytecode, options.debug ? code : undefined, options.debug ? sourceMap : undefined);
+  const artifact = generateArtifact(
+    ast,
+    optimisedBytecode,
+    options.debug ? code : undefined,
+    options.debug ? sourceMap : undefined,
+  );
+
+  if (warnings.length > 0) {
+    artifact.warnings = warnings;
+  }
+
+  return artifact;
 }
 
 export function compileFile(codeFile: string, options: CompileOptions = {}): Artifact {

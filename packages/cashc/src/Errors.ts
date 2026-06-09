@@ -1,4 +1,4 @@
-import { Type, PrimitiveType } from '@radiantscript/utils';
+import { Type, PrimitiveType, LintWarning } from '@radiantscript/utils';
 import {
   IdentifierNode,
   FunctionDefinitionNode,
@@ -300,5 +300,20 @@ export class NullDataSizeError extends CashScriptError {
     byteLength: number,
   ) {
     super(node, `Nulldata chunk of ${byteLength} bytes is too large; the nulldata builder only supports chunks up to 255 bytes`);
+  }
+}
+
+// Thrown by the covenant-lint pass when running in `'error'` (strict) mode and
+// at least one (un-suppressed) heuristic warning was emitted. The individual
+// warnings are attached so callers/tooling can present them.
+export class CovenantLintError extends Error {
+  constructor(
+    public warnings: LintWarning[],
+  ) {
+    const detail = warnings
+      .map((w) => `  [${w.rule}] ${w.line}:${w.column}${w.functionName ? ` (${w.functionName})` : ''} ${w.message}`)
+      .join('\n');
+    super(`Covenant lint found ${warnings.length} issue(s) in strict mode:\n${detail}`);
+    this.name = this.constructor.name;
   }
 }

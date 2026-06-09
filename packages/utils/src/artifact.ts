@@ -28,6 +28,17 @@ export interface SourceMap {
   [bytecodeOffset: number]: SourceMapEntry;
 }
 
+// A single heuristic covenant-lint diagnostic emitted by the cashc compiler.
+// Additive and optional on the Artifact: tooling that does not understand it
+// (e.g. the cashscript SDK) simply ignores the field.
+export interface LintWarning {
+  rule: string;
+  message: string;
+  line: number;
+  column: number;
+  functionName?: string;
+}
+
 export interface Artifact {
   version: number;
   compilerVersion: string;
@@ -37,6 +48,9 @@ export interface Artifact {
   hex?: string;
   source?: string;
   sourceMap?: SourceMap;
+  // Heuristic covenant-lint warnings collected at compile time (warn mode).
+  // Omitted when there are none, or when lint is disabled.
+  warnings?: LintWarning[];
 }
 
 export function importArtifact(artifactFile: string): Artifact {

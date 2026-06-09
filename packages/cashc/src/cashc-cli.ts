@@ -22,6 +22,8 @@ program
   .option('-c, --opcount', 'Display the number of opcodes in the compiled bytecode.')
   .option('-s, --size', 'Display the size in bytes of the compiled bytecode.')
   .option('-d, --debug', 'Include source code and source map in artifact for debugging with rxdeb.')
+  .option('--strict', 'Treat covenant-lint warnings as errors (alias for --covenant-lint=error).')
+  .option('--covenant-lint <mode>', 'Covenant lint mode: off | warn | error (default: warn).')
   .helpOption('-?, --help', 'Display help')
   .parse();
 
@@ -48,7 +50,29 @@ function run(): void {
       console.warn('   Source code exposure may aid attackers in finding vulnerabilities.\n');
     }
 
-    const artifact = compileFile(sourceFile, { debug: opts.debug });
+    // Resolve covenant-lint mode. --strict is shorthand for error mode; an
+    // explicit --covenant-lint always wins if both are given.
+    let covenantLint: 'off' | 'warn' | 'error' | undefined;
+    if (opts.covenantLint) {
+      ensure(
+        ['off', 'warn', 'error'].includes(opts.covenantLint),
+        'Flag --covenant-lint must be one of: off, warn, error',
+      );
+      covenantLint = opts.covenantLint;
+    } else if (opts.strict) {
+      covenantLint = 'error';
+    }
+
+    const artifact = compileFile(sourceFile, { debug: opts.debug, covenantLint });
+
+    // Print covenant-lint warnings to STDERR so STDOUT stays clean/pipeable.
+    if (artifact.warnings && artifact.warnings.length > 0) {
+      artifact.warnings.forEach((w) => {
+        const where = w.functionName ? ` (${w.functionName})` : '';
+        console.error(`warning [${w.rule}] ${w.line}:${w.column}${where} ${w.message}`);
+      });
+    }
+
     const script = asmToScript(artifact.asm);
 
     const opcount = countOpcodes(script);

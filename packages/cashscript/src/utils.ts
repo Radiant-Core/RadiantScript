@@ -39,6 +39,7 @@ import {
   FailedTimeCheckError,
   FailedSigCheckError,
 } from './Errors.js';
+import { encodePush } from './RadiantHelpers.js';
 
 // `encodeBase58AddressFormat` / `decodeBase58AddressFormat` in libauth ^1.19
 // require an injected SHA-256 implementation; wrap the project's own SHA-256
@@ -112,6 +113,17 @@ export function getInputSize(inputScript: Uint8Array): number {
   return 32 + 4 + varIntSize + scriptSize + 4;
 }
 
+/**
+ * Size (in bytes) of a BCH-style sighash preimage covering `script`.
+ *
+ * @deprecated Legacy — unused by the live build path. The live
+ * transaction-build path NO LONGER pushes a sighash preimage onto the unlocking
+ * stack (P5). Radiant covenants use reference-based introspection, not preimage
+ * covenants, and the `Contract` constructor rejects any artifact that sets the
+ * legacy `abiFunction.covenant` flag. This helper is retained only as a pure
+ * size utility (and for its existing unit tests) but is no longer invoked when
+ * building a transaction; do not wire it into new build logic.
+ */
 export function getPreimageSize(script: Uint8Array): number {
   const scriptSize = script.byteLength;
   const varIntSize = scriptSize > 252 ? 3 : 1;
@@ -136,12 +148,21 @@ export function getTxSizeWithoutInputs(outputs: Output[]): number {
 
   let size = VERSION_SIZE + LOCKTIME_SIZE;
   size += outputs.reduce((acc, output) => {
+    // A `stateScript` (raw Radiant state bytes) is wrapped into the canonical
+    // `<pushState> OP_STATESEPARATOR(1B) <code>` layout by resolveOutput, so its
+    // serialized contribution is the push-encoded state plus the 1-byte
+    // separator — NOT just the raw state length. Mirror buildStatefulOutput's
+    // encoding exactly so the fee estimate matches the bytecode that ships.
+    const stateSize = output.stateScript === undefined
+      ? 0
+      : encodePush(output.stateScript).byteLength + 1;
+
     if (typeof output.to === 'string') {
-      return acc + P2PKH_OUTPUT_SIZE;
+      return acc + P2PKH_OUTPUT_SIZE + stateSize;
     }
 
-    // Size of an OP_RETURN output = byteLength + 8 (amount) + 2 (scriptSize)
-    return acc + output.to.byteLength + 8 + 2;
+    // Size of a raw/OP_RETURN output = byteLength + 8 (amount) + 2 (scriptSize)
+    return acc + output.to.byteLength + stateSize + 8 + 2;
   }, 0);
   // Add tx-out count (accounting for a potential change output)
   size += encodeInt(outputs.length + 1).byteLength;
@@ -150,6 +171,18 @@ export function getTxSizeWithoutInputs(outputs: Output[]): number {
 }
 
 // ////////// BUILD OBJECTS ///////////////////////////////////////////////////
+/**
+ * Build an unlocking (input) script from the encoded arguments, optional
+ * function selector, and — legacy only — an optional sighash preimage.
+ *
+ * P5 / legacy: the live build path no longer passes `preimage` (the
+ * preimage-on-stack covenant path has been removed; Radiant uses
+ * reference-based introspection). The `preimage` parameter is **deprecated,
+ * unused by the live path, and always undefined in production**; it is retained
+ * only for backward compatibility and its existing unit tests. The function
+ * itself remains in active use for building selector/arg input scripts — only
+ * the trailing `preimage` argument is legacy. Do not pass it in new code.
+ */
 export function createInputScript(
   redeemScript: Script,
   encodedArgs: Uint8Array[],
@@ -253,8 +286,14 @@ function toRegExp(reasons: string[]): RegExp {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   };
 
-  // Limit total pattern length to prevent excessive regex processing
-  const MAX_PATTERN_LENGTH = 500;
+  // Sanity bound to prevent pathologically large patterns. The `reasons`
+  // passed by `buildError` are fixed internal constant lists (already
+  // regex-escaped above, so there is no ReDoS exposure from user input); the
+  // largest of them (the require-equivalent failure list) is ~740 chars, so the
+  // previous 500-char cap tripped on EVERY buildError call and masked the real
+  // failure reason with "Pattern too long". 2000 comfortably fits all three
+  // lists while still bounding runaway growth.
+  const MAX_PATTERN_LENGTH = 2000;
   const joinedPattern = reasons.map(escapeRegExp).join('|');
 
   if (joinedPattern.length > MAX_PATTERN_LENGTH) {

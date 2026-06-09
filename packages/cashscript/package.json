@@ -38,7 +38,7 @@
     "compile:module": "tsc -p tsconfig.build.module.json",
     "lint": "eslint . --ext .ts --ignore-path ../../.eslintignore",
     "prepublishOnly": "npm test && npm run lint",
-    "test": "jest --config=../../jest.config.js --testPathIgnorePatterns=/e2e/ --testRegex='packages/cashscript/test/(RadiantHelpers|util|Contract\\.schema|Transaction|Contract)\\.test\\.ts$' --forceExit"
+    "test": "jest --config=../../jest.config.js --testPathIgnorePatterns=/e2e/ --testRegex='packages/cashscript/test/(RadiantHelpers|util|Contract\\.schema|Transaction|Contract|OutputTemplate|Preflight)\\.test\\.ts$' --forceExit"
   },
   "dependencies": {
     "@bitauth/libauth": "^1.19.1",

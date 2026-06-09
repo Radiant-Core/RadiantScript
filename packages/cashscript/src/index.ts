@@ -1,5 +1,15 @@
 export { Contract } from './Contract.js';
 export { Transaction } from './Transaction.js';
+export type { SendOptions, PreflightReport } from './Transaction.js';
+export {
+  p2pkhOutput,
+  p2shOutput,
+  opReturnOutput,
+  rawOutput,
+  resolveOutput,
+  resolvedOutputsEqual,
+} from './OutputTemplate.js';
+export type { ResolvedOutput } from './OutputTemplate.js';
 export {
   encodeTokenRef,
   decodeTokenRef,
@@ -16,6 +26,8 @@ export * as utils from '@radiantscript/utils';
 export { hash160, hash256, sha256 } from '@radiantscript/utils';
 export {
   Utxo,
+  Output,
+  SatoshiAmount,
   Recipient,
   SignatureAlgorithm,
   HashType,

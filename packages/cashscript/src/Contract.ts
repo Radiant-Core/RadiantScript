@@ -195,6 +195,24 @@ function validateArtifact(artifact: unknown): asserts artifact is Artifact {
     if (fn.type === 'function' && typeof fn.name !== 'string') {
       throw new Error(`Invalid artifact (${a.contract}): abi[${idx}].name must be a string for functions`);
     }
+
+    // P5: reject the legacy BCH preimage-covenant flag. The RadiantScript
+    // compiler NEVER sets `covenant` — Radiant enforces covenants via
+    // reference-based introspection (PUSHINPUTREF / state separators), not by
+    // pushing a sighash preimage onto the unlocking stack. A hand-authored or
+    // third-party artifact that sets `covenant` would otherwise reach an
+    // unaudited, now-removed preimage code path. Refuse ANY truthy value (not
+    // just the literal `true`) so a coerced flag — `covenant: 1`, `"yes"`, `{}`
+    // — cannot slip past the guard and silently mis-build a transaction. Refuse
+    // it at construction with a clear explanation.
+    if (fn.covenant) {
+      throw new Error(
+        `Invalid artifact (${a.contract}): abi[${idx}] sets the legacy "covenant" flag, which `
+        + 'is unsupported. Radiant uses reference-based introspection, not preimage covenants; '
+        + 'the preimage-on-stack covenant path has been removed. Recompile the contract with the '
+        + 'RadiantScript compiler (which never sets this flag).',
+      );
+    }
     if (!Array.isArray(fn.params)) {
       throw new Error(`Invalid artifact (${a.contract}): abi[${idx}].params must be an array`);
     }

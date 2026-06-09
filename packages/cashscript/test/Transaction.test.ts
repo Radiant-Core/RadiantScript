@@ -334,20 +334,26 @@ describe('Transaction fee / change / signing fixes', () => {
     ).rejects.toThrow(/SIGHASH_SINGLE/);
   });
 
-  // L-2: covenant signatures must all share one hash type, because only the
-  // first one's hash type is baked into the single on-stack preimage.
-  it('L-2: covenant signatures with differing hash types throw', async () => {
+  // L-2 (was a guard, now removed): a covenant spend with multiple signature
+  // args of DIFFERENT hash types is legitimate. Each covenant signature is
+  // signed over its own per-arg sighash type and carries its own trailing
+  // hashtype byte, so on-chain OP_CHECKSIG validates each one independently —
+  // there is no shared on-stack preimage for them to disagree about (the
+  // preimage-on-stack path was removed, P5). The old guard ("All covenant
+  // signatures must use the same hash type") was stale + over-restrictive and
+  // has been removed; this test now asserts the mixed-hashtype build SUCCEEDS.
+  it('L-2: covenant signatures with differing hash types now build successfully', async () => {
     // Drive the covenant-arg path directly: a Transaction whose `args` carry
     // two SignatureTemplates with different hash types, spending a non-signable
-    // input. The contract artifact is irrelevant to the guard, so reuse p2pkh's
-    // redeem script via a Contract and swap the args on the built Transaction.
+    // input (so the args take the covenant signing branch). Reuse p2pkh's
+    // redeem script and supply the args directly on a constructed Transaction.
     const { asmToScript } = require('@radiantscript/utils');
     const redeemScript = asmToScript('OP_OVER OP_HASH160 OP_EQUALVERIFY OP_CHECKSIG');
     const tx = new (Transaction as any)(
       aliceAddress,
       stubProvider(),
       redeemScript,
-      { type: 'function', name: 'spend', covenant: true, inputs: [] },
+      { type: 'function', name: 'spend', inputs: [] },
       [
         new SignatureTemplate(alice, HashType.SIGHASH_ALL),
         new SignatureTemplate(alice, HashType.SIGHASH_NONE),
@@ -355,14 +361,24 @@ describe('Transaction fee / change / signing fixes', () => {
       undefined,
     ) as Transaction;
 
-    await expect(
-      tx
-        .from({ txid: 'a'.repeat(64), vout: 0, satoshis: 100_000 })
-        .to(aliceAddress, 1000)
-        .withHardcodedFee(1000)
-        .withoutPrevoutVerification()
-        .build(),
-    ).rejects.toThrow(/same hash type/);
+    const txHex = await tx
+      .from({ txid: 'a'.repeat(64), vout: 0, satoshis: 100_000 })
+      .to(aliceAddress, 1000)
+      .withHardcodedFee(1000)
+      .withoutPrevoutVerification()
+      .build();
+
+    // The build no longer throws; it produces a decodable transaction whose
+    // single input's unlocking script carries BOTH signatures, each ending in
+    // its own hashtype byte (0x41 = SIGHASH_ALL|forkid, 0x42 = SIGHASH_NONE|forkid).
+    expect(typeof txHex).toBe('string');
+    const decoded = decodeTransaction(hexToBin(txHex));
+    if (typeof decoded === 'string') throw new Error(decoded);
+    expect(decoded.inputs).toHaveLength(1);
+    const unlockingHex = binToHex(decoded.inputs[0].unlockingBytecode);
+    // Each Schnorr sig is 64 bytes + 1 hashtype byte; both hashtype bytes appear.
+    expect(unlockingHex).toContain('41'); // SIGHASH_ALL | forkid
+    expect(unlockingHex).toContain('42'); // SIGHASH_NONE | forkid
   });
 });
 

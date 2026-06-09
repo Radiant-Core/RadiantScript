@@ -34,4 +34,22 @@ export default interface NetworkProvider {
    * @returns The transaction ID corresponding to the broadcast transaction.
    */
   sendRawTransaction(txHex: string): Promise<string>;
+
+  /**
+   * OPTIONAL. Ask the node whether a raw transaction would be accepted into the
+   * mempool WITHOUT broadcasting it (the equivalent of Bitcoin's
+   * `testmempoolaccept`). Providers that wrap an RPC node may implement this;
+   * those that cannot (e.g. plain ElectrumX) omit it.
+   *
+   * When present, {@link Transaction.preflight} calls it as a best-effort extra
+   * check. A reject result is surfaced in the preflight report. Note that this
+   * runs the node's relay/policy + script checks, which CAN catch covenant
+   * violations the off-chain structural checks cannot — but it is still an
+   * optional convenience, not a guarantee that every provider offers.
+   *
+   * @param txHex The raw transaction hex to test.
+   * @returns `{ accepted: true }` if the node would accept it, otherwise
+   *          `{ accepted: false, reason }` with the node's rejection reason.
+   */
+  testMempoolAccept?(txHex: string): Promise<{ accepted: boolean; reason?: string }>;
 }

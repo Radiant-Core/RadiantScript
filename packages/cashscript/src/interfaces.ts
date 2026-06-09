@@ -31,6 +31,24 @@ export interface Recipient {
 export interface Output {
   to: string | Uint8Array;
   amount: SatoshiAmount;
+  /**
+   * Optional RAW state bytes for a stateful Radiant output.
+   *
+   * Pass the bare state the covenant's introspection compares against — e.g.
+   * `0x14 <pkh>` to satisfy `tx.outputs[0].stateScript == 0x14 + newOwnerPkh`.
+   * Do NOT push-encode it or append `OP_STATESEPARATOR` yourself: the SDK wraps
+   * these bytes into the canonical on-chain layout
+   * `<pushState> OP_STATESEPARATOR(0xbd) <code>`, push-encoding the state and
+   * inserting the separator for you. The result is byte-for-byte identical to
+   * `buildStatefulOutput(stateScript, code)`, so a template and the built
+   * transaction agree and the on-chain `stateSeparatorByteIndex` correctly lands
+   * after the state section.
+   *
+   * Additive and backward-compatible: existing flows that bake the full stateful
+   * bytecode into `to` (e.g. via `Contract.buildStatefulOutput`) leave this
+   * undefined and are unaffected.
+   */
+  stateScript?: Uint8Array;
 }
 
 export enum SignatureAlgorithm {

@@ -39,6 +39,64 @@ describe('Contract', () => {
       expect(() => new Contract({ ...artifact, contract: undefined }, [], provider)).toThrow();
     });
 
+    // P5: reject the legacy BCH preimage-covenant flag at construction. The
+    // RadiantScript compiler never sets it; a hand-authored / third-party
+    // artifact that does would otherwise reach the removed preimage code path.
+    it('should reject an artifact whose abi sets covenant:true (P5)', () => {
+      // eslint-disable-next-line global-require
+      const base = require('./fixture/p2pkh.json');
+      const provider = new ElectrumNetworkProvider();
+
+      const covenantArtifact = {
+        ...base,
+        abi: base.abi.map((entry: any) => (
+          entry.type === 'function' ? { ...entry, covenant: true } : entry
+        )),
+      };
+
+      expect(() => new Contract(covenantArtifact, [placeholder(20)], provider))
+        .toThrow(/covenant/);
+      expect(() => new Contract(covenantArtifact, [placeholder(20)], provider))
+        .toThrow(/reference-based introspection/);
+    });
+
+    // FIX-C: the guard must reject ANY truthy `covenant`, not only the literal
+    // `true`. A coerced/hand-authored value (`1`, `"yes"`, `{}`) would otherwise
+    // pass the old strict `=== true` check and defeat the intended loud
+    // rejection of the removed preimage-covenant path.
+    it('rejects an artifact whose abi sets a truthy non-boolean covenant (FIX-C)', () => {
+      // eslint-disable-next-line global-require
+      const base = require('./fixture/p2pkh.json');
+      const provider = new ElectrumNetworkProvider();
+
+      const truthyValues: any[] = [1, 'yes', {}, [], 'false'];
+      truthyValues.forEach((value) => {
+        const artifact = {
+          ...base,
+          abi: base.abi.map((entry: any) => (
+            entry.type === 'function' ? { ...entry, covenant: value } : entry
+          )),
+        };
+        expect(() => new Contract(artifact, [placeholder(20)], provider))
+          .toThrow(/covenant/);
+        expect(() => new Contract(artifact, [placeholder(20)], provider))
+          .toThrow(/reference-based introspection/);
+      });
+    });
+
+    it('still accepts an artifact with covenant:false or unset (P5 backward-compat)', () => {
+      // eslint-disable-next-line global-require
+      const base = require('./fixture/p2pkh.json');
+      const provider = new ElectrumNetworkProvider();
+      const withFalse = {
+        ...base,
+        abi: base.abi.map((entry: any) => (
+          entry.type === 'function' ? { ...entry, covenant: false } : entry
+        )),
+      };
+      expect(() => new Contract(withFalse, [placeholder(20)], provider)).not.toThrow();
+    });
+
     it('should create new P2PKH instance', () => {
       // eslint-disable-next-line global-require
       const artifact = require('./fixture/p2pkh.json');

@@ -32,12 +32,16 @@ import {
   getInputSize,
   createOpReturnOutput,
   getTxSizeWithoutInputs,
-  getPreimageSize,
   buildError,
   addressToLockScript,
   createSighashPreimage,
   validateRecipient,
 } from './utils.js';
+import {
+  resolveOutput,
+  resolvedOutputsEqual,
+  ResolvedOutput,
+} from './OutputTemplate.js';
 import {
   P2SH_OUTPUT_SIZE,
   DUST_LIMIT,
@@ -47,6 +51,8 @@ import {
   MAX_OUTPUT_COUNT,
   MAX_SAFE_SATOSHIS,
   MAX_MONEY,
+  PREFLIGHT_FEE_PER_BYTE_WARN,
+  PREFLIGHT_FEE_PER_BYTE_MAX,
 } from './constants.js';
 import NetworkProvider from './network/NetworkProvider.js';
 import SignatureTemplate from './SignatureTemplate.js';
@@ -60,6 +66,64 @@ export interface SendOptions {
   signal?: AbortSignal;
   /** Override the default polling cap (1200 iterations ≈ 10 min at 500 ms). */
   maxRetries?: number;
+  /**
+   * Run {@link Transaction.preflight} before broadcasting and abort the send
+   * (throwing the first error) if any structural check fails. Default `false`
+   * — opt in to fail fast with a precise reason instead of an opaque relay
+   * rejection. See `preflight()`'s docs for exactly what it does and does NOT
+   * check.
+   */
+  preflight?: boolean;
+}
+
+/**
+ * Result of {@link Transaction.preflight} — a BOUNDED, off-chain, structural
+ * pre-broadcast report.
+ *
+ * ⚠️ IMPORTANT — READ THIS: preflight is a **bounded structural pre-flight, NOT
+ * a Radiant-consensus virtual machine.** It performs cheap, honest off-chain
+ * sanity checks (dust, fee bounds, input/output counts, value conservation, and
+ * — if declared — the exact-output template match). It DOES NOT execute the
+ * covenant script, evaluate Radiant introspection opcodes, verify signatures,
+ * or model relay policy. A transaction that passes preflight can still be
+ * rejected on-chain or by relay — in particular, **preflight cannot catch all
+ * covenant violations** because it never runs the covenant. Treat a passing
+ * report as "the obvious structural footguns are absent", not "this will be
+ * accepted".
+ */
+export interface PreflightReport {
+  /** `true` iff every check passed (`errors` is empty). */
+  ok: boolean;
+  /**
+   * Hard failures that would make the transaction non-relayable or invalid.
+   * Each is a precise, human-readable message.
+   */
+  errors: string[];
+  /** Non-fatal advisories (e.g. an unusually high — but in-bounds — fee). */
+  warnings: string[];
+  /** Decoded summary of the built transaction, for logging/inspection. */
+  summary: {
+    /** Raw transaction hex that was checked. */
+    txHex: string;
+    /** Serialized size in bytes. */
+    sizeBytes: number;
+    inputCount: number;
+    outputCount: number;
+    /** Sum of input satoshis (bigint). */
+    totalIn: bigint;
+    /** Sum of output satoshis (bigint). */
+    totalOut: bigint;
+    /** Implied fee = totalIn − totalOut (bigint; may be negative on a bug). */
+    fee: bigint;
+    /** Fee per byte (number; `fee / sizeBytes`). */
+    feePerByte: number;
+  };
+  /**
+   * Optional provider mempool-acceptance result, present only when the provider
+   * implements {@link NetworkProvider.testMempoolAccept}. Unlike the structural
+   * checks, a node-side `accepted:false` CAN reflect a covenant/script failure.
+   */
+  mempoolAccept?: { accepted: boolean; reason?: string };
 }
 
 export class Transaction {
@@ -72,6 +136,12 @@ export class Transaction {
   private feePerByte = 1.0;
   private minChange = DUST_LIMIT;
   private verifyPrevoutsEnabled = true;
+
+  // P3: the asserted ("exact") output set, if the caller opted in via
+  // .withExactOutputs(). When set, build() verifies the final output set matches
+  // these declared outputs (plus an optionally-allowed appended change output).
+  private assertedOutputs: ResolvedOutput[] | undefined;
+  private assertedAllowChange = true;
 
   constructor(
     private address: string,
@@ -136,6 +206,54 @@ export class Transaction {
 
   withOpReturn(chunks: string[]): this {
     this.outputs.push(createOpReturnOutput(chunks));
+    return this;
+  }
+
+  /**
+   * Declare the EXACT set of outputs the transaction must produce, from a single
+   * source of truth, and assert at {@link build} time that the built transaction
+   * matches it byte-for-byte (locking bytecode + amount).
+   *
+   * This is the "build the expected output, assert equality" idiom for covenant
+   * safety. A covenant enforces a particular output set via on-chain
+   * introspection; if the transaction BUILDER and the COVENANT disagree, the
+   * spend reverts on-chain (or, for an under-constrained covenant, can be
+   * steered to an attacker-favourable result). Declaring the outputs here from
+   * the same template the covenant expects, and asserting equality off-chain,
+   * surfaces a mismatch with a precise error before broadcast.
+   *
+   * Build the templates with the helpers in {@link ./OutputTemplate.js}
+   * (`p2pkhOutput`, `p2shOutput`, `opReturnOutput`, `rawOutput`) — they produce
+   * the same `Output` shape `.to()` uses, so the two are interchangeable.
+   *
+   * This REPLACES any outputs previously added via `.to()` / `.withOpReturn()`
+   * and is a stricter, opt-in alternative to them — existing flows that never
+   * call this are unaffected.
+   *
+   * @param outputs        The exact outputs (in order). At least one is required.
+   * @param opts.allowChange  Whether an automatically-appended change output is
+   *                          permitted beyond the declared set (default `true`).
+   *                          Pass `false` to forbid change entirely; this also
+   *                          suppresses change-output creation (equivalent to
+   *                          `.withoutChange()`), so the built output set must
+   *                          equal the declared set exactly.
+   */
+  withExactOutputs(outputs: Output[], opts?: { allowChange?: boolean }): this {
+    if (!Array.isArray(outputs) || outputs.length === 0) {
+      throw new Error('withExactOutputs requires a non-empty array of outputs');
+    }
+    outputs.forEach((output) => {
+      if (typeof output.to === 'string') validateRecipient(output as Recipient);
+    });
+
+    this.outputs = outputs.slice();
+    this.assertedOutputs = outputs.map(resolveOutput);
+    this.assertedAllowChange = opts?.allowChange ?? true;
+
+    // Forbidding change means the declared set is the whole output set, so also
+    // suppress change-output creation (mirrors .withoutChange()).
+    if (!this.assertedAllowChange) this.withoutChange();
+
     return this;
   }
 
@@ -223,6 +341,10 @@ export class Transaction {
       throw new Error(`Too many outputs: ${this.outputs.length} exceeds maximum of ${MAX_OUTPUT_COUNT}`);
     }
 
+    // P3: if an exact output set was declared via .withExactOutputs(), assert
+    // the final outputs (after any appended change) match it before we sign.
+    this.assertOutputsMatchTemplate();
+
     const secp256k1 = await instantiateSecp256k1();
 
     // H-2 (full): authenticate every input's prevout (value + locking script)
@@ -246,11 +368,8 @@ export class Transaction {
     this.outputs.forEach((output) => this.validateAmount(output.amount));
 
     const outputs = this.outputs.map((output) => {
-      const lockingBytecode = typeof output.to === 'string'
-        ? addressToLockScript(output.to)
-        : output.to;
-
-      const satoshis = bigIntToBinUint64LE(toBigSat(output.amount));
+      const { lockingBytecode, amount } = resolveOutput(output);
+      const satoshis = bigIntToBinUint64LE(amount);
 
       return { lockingBytecode, satoshis };
     });
@@ -286,21 +405,18 @@ export class Transaction {
         return;
       }
 
-      let covenantHashType = -1;
       const completeArgs = this.args.map((arg) => {
         if (!(arg instanceof SignatureTemplate)) return arg;
 
+        // Each covenant signature is signed over its OWN per-arg sighash type
+        // and carries its own trailing hashtype byte, so on-chain OP_CHECKSIG
+        // recomputes and validates every signature independently. There is no
+        // shared on-stack preimage to disagree about (the legacy
+        // preimage-on-stack covenant path was removed — see P5 below), so the
+        // former L-2 "all covenant signatures must use the same hash type"
+        // guard was both unnecessary and over-restrictive (it wrongly rejected
+        // a legitimate multi-hashtype covenant spend). It has been removed.
         const argHashType = arg.getHashType();
-
-        // First signature is used for sighash preimage (maybe not the best way)
-        if (covenantHashType < 0) {
-          covenantHashType = argHashType;
-        } else if (covenantHashType !== argHashType) {
-          // L-2: the on-stack preimage is built from the first signature's hash
-          // type only, so all covenant signatures must agree on it — otherwise
-          // the later signatures would be verified against the wrong preimage.
-          throw new Error('All covenant signatures must use the same hash type');
-        }
 
         this.assertSingleHasOutput(argHashType, i);
 
@@ -310,12 +426,14 @@ export class Transaction {
         return arg.generateSignature(sighash, secp256k1);
       });
 
-      const preimage = this.abiFunction.covenant
-        ? createSighashPreimage(transaction, utxo, i, bytecode, covenantHashType)
-        : undefined;
-
+      // P5: the legacy BCH preimage-on-stack covenant path has been removed.
+      // Radiant covenants use reference-based introspection, not a sighash
+      // preimage pushed onto the stack, and the RadiantScript compiler never
+      // sets `abiFunction.covenant` (see @radiantscript/utils artifact.ts).
+      // The Contract constructor now rejects any artifact that sets it, so this
+      // branch is unreachable; no preimage is ever appended to the input script.
       const inputScript = createInputScript(
-        this.redeemScript, completeArgs, this.selector, preimage,
+        this.redeemScript, completeArgs, this.selector,
       );
 
       inputScripts.push(inputScript);
@@ -339,6 +457,160 @@ export class Transaction {
     return txHex;
   }
 
+  /**
+   * Run a BOUNDED, off-chain, pre-broadcast structural pre-flight and return a
+   * {@link PreflightReport}.
+   *
+   * ⚠️ This is **NOT a Radiant-consensus VM.** It builds the transaction and
+   * runs cheap, honest sanity checks that surface precise errors instead of an
+   * opaque "non-relayable" rejection at broadcast time:
+   *
+   *  - **Dust**: every output's amount is ≥ the dust limit (OP_RETURN outputs,
+   *    which carry 0 value by design, are exempt).
+   *  - **Fee sanity**: implied fee = Σinputs − Σoutputs is within
+   *    `[0, MAX_FEE_SATOSHIS]`, and fee-per-byte is not absurd (a warning above
+   *    a high threshold; an error above an even higher hard cap).
+   *  - **Counts**: input/output counts are within `MAX_INPUT_COUNT` /
+   *    `MAX_OUTPUT_COUNT`, and there is at least one input and one output.
+   *  - **Value conservation**: Σinputs == Σoutputs + fee (tautological for a
+   *    fee derived this way, but it re-validates that no value is unaccounted
+   *    for and that the fee is non-negative).
+   *  - **Size**: serialized size ≤ `MAX_TRANSACTION_SIZE`.
+   *  - **Exact-output template** (P3): if `.withExactOutputs()` was used, the
+   *    built outputs match the declared set (this also runs inside `build()`).
+   *  - **Provider mempool test** (optional): if the provider implements
+   *    {@link NetworkProvider.testMempoolAccept}, its result is recorded.
+   *
+   * It does **NOT** execute the covenant, evaluate introspection opcodes, verify
+   * signatures, or fully model relay policy — so a passing report does NOT
+   * guarantee acceptance, and in particular **cannot catch all covenant
+   * violations**. The optional provider mempool test is the only step that runs
+   * actual node-side script/policy checks.
+   *
+   * Pure (read-only): it never broadcasts. Use it directly, or pass
+   * `{ preflight: true }` to `send()` to run it first and abort on failure.
+   */
+  async preflight(): Promise<PreflightReport> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Building also runs prevout verification (default-on) and the P3 template
+    // assertion, so structural problems that build() already rejects surface as
+    // a thrown error here — wrap so the caller always gets a report shape would
+    // be nicer, but build()'s own guards are hard failures by design, so we let
+    // them throw. preflight's job is the cheaper relay-shaped checks below.
+    const txHex = await this.build();
+    const bytes = hexToBin(txHex);
+    const sizeBytes = bytes.length;
+
+    // Sum inputs (validated + populated by build()) and decoded outputs.
+    const totalIn = this.inputs.reduce<bigint>((acc, i) => acc + BigInt(i.satoshis), 0n);
+    const totalOut = this.outputs.reduce<bigint>((acc, o) => acc + toBigSat(o.amount), 0n);
+    const fee = totalIn - totalOut;
+
+    const inputCount = this.inputs.length;
+    const outputCount = this.outputs.length;
+
+    // --- Counts -------------------------------------------------------------
+    if (inputCount === 0) errors.push('Preflight: transaction has no inputs.');
+    if (outputCount === 0) errors.push('Preflight: transaction has no outputs.');
+    if (inputCount > MAX_INPUT_COUNT) {
+      errors.push(`Preflight: too many inputs (${inputCount} > ${MAX_INPUT_COUNT}).`);
+    }
+    if (outputCount > MAX_OUTPUT_COUNT) {
+      errors.push(`Preflight: too many outputs (${outputCount} > ${MAX_OUTPUT_COUNT}).`);
+    }
+
+    // --- Size ---------------------------------------------------------------
+    if (sizeBytes > MAX_TRANSACTION_SIZE) {
+      errors.push(`Preflight: size ${sizeBytes} bytes exceeds maximum ${MAX_TRANSACTION_SIZE}.`);
+    }
+
+    // --- Dust (per output) --------------------------------------------------
+    this.outputs.forEach((output, k) => {
+      const amount = toBigSat(output.amount);
+      // OP_RETURN outputs are 0-value by design (first byte 0x6a); exempt them.
+      const isOpReturn = output.to instanceof Uint8Array && output.to[0] === 0x6a;
+      if (!isOpReturn && amount < BigInt(DUST_LIMIT)) {
+        errors.push(
+          `Preflight: output ${k} amount ${amount} is below the dust limit (${DUST_LIMIT}).`,
+        );
+      }
+    });
+
+    // --- Fee sanity ---------------------------------------------------------
+    if (fee < 0n) {
+      errors.push(
+        `Preflight: negative fee (${fee}) — outputs exceed inputs by ${-fee} satoshis.`,
+      );
+    } else if (fee > BigInt(MAX_FEE_SATOSHIS)) {
+      errors.push(
+        `Preflight: fee ${fee} exceeds MAX_FEE_SATOSHIS (${MAX_FEE_SATOSHIS}).`,
+      );
+    }
+
+    // --- Value conservation -------------------------------------------------
+    // Σinputs must equal Σoutputs + fee. By construction fee = totalIn − totalOut
+    // so this holds whenever fee >= 0; the check makes value loss explicit and
+    // double-guards against a future refactor breaking the invariant.
+    if (totalIn !== totalOut + fee) {
+      errors.push(
+        `Preflight: value not conserved: inputs ${totalIn} != outputs ${totalOut} + fee ${fee}.`,
+      );
+    }
+
+    // --- Fee-per-byte sanity ------------------------------------------------
+    const feePerByteValue = sizeBytes > 0 ? Number(fee) / sizeBytes : 0;
+    // Warn well before the hard error so a caller notices an over-fee in tests.
+    if (fee >= 0n && feePerByteValue > PREFLIGHT_FEE_PER_BYTE_WARN) {
+      warnings.push(
+        `Preflight: fee-per-byte ${feePerByteValue.toFixed(2)} sat/B is unusually high `
+        + `(> ${PREFLIGHT_FEE_PER_BYTE_WARN}).`,
+      );
+    }
+    if (fee >= 0n && feePerByteValue > PREFLIGHT_FEE_PER_BYTE_MAX) {
+      errors.push(
+        `Preflight: fee-per-byte ${feePerByteValue.toFixed(2)} sat/B is implausibly high `
+        + `(> ${PREFLIGHT_FEE_PER_BYTE_MAX}); refusing as a likely caller bug.`,
+      );
+    }
+
+    // --- Optional provider mempool acceptance test --------------------------
+    let mempoolAccept: { accepted: boolean; reason?: string } | undefined;
+    if (typeof this.provider.testMempoolAccept === 'function') {
+      try {
+        mempoolAccept = await this.provider.testMempoolAccept(txHex);
+        if (mempoolAccept && mempoolAccept.accepted === false) {
+          errors.push(
+            'Preflight: provider mempool test rejected the transaction'
+            + `${mempoolAccept.reason ? `: ${mempoolAccept.reason}` : '.'}`,
+          );
+        }
+      } catch (e: any) {
+        // A provider that advertises the method but fails the call is a
+        // best-effort step — record a warning, don't fail preflight on it.
+        warnings.push(`Preflight: provider mempool test could not run: ${e?.message ?? e}`);
+      }
+    }
+
+    return {
+      ok: errors.length === 0,
+      errors,
+      warnings,
+      summary: {
+        txHex,
+        sizeBytes,
+        inputCount,
+        outputCount,
+        totalIn,
+        totalOut,
+        fee,
+        feePerByte: feePerByteValue,
+      },
+      mempoolAccept,
+    };
+  }
+
   async send(opts?: SendOptions): Promise<TransactionDetails>;
   async send(raw: true, opts?: SendOptions): Promise<string>;
 
@@ -350,6 +622,10 @@ export class Transaction {
    *              - `signal`:    `AbortSignal` to cancel the polling loop. The poll throws
    *                             `'getTxDetails aborted by caller'` on next iteration.
    *              - `maxRetries`: Override the default 1200 (≈10 min @ 500 ms) polling cap.
+   *              - `preflight`: When `true`, run {@link preflight} first and throw the
+   *                             first structural error (with the full list) before
+   *                             broadcasting. Note: preflight is a BOUNDED structural
+   *                             check, not a consensus VM — see `preflight()`.
    */
   async send(
     rawOrOpts?: true | SendOptions,
@@ -357,7 +633,23 @@ export class Transaction {
   ): Promise<TransactionDetails | string> {
     const raw = rawOrOpts === true ? true : undefined;
     const opts = (rawOrOpts === true ? maybeOpts : rawOrOpts) ?? {};
-    const tx = await this.build();
+
+    // When preflight is requested, run it first and REUSE its built hex so the
+    // transaction is built exactly once (build() mutates input/output selection
+    // and is not idempotent — a second build() would append a second change
+    // output). Otherwise build() here as before.
+    let tx: string;
+    if (opts.preflight) {
+      const report = await this.preflight();
+      if (!report.ok) {
+        throw new Error(
+          `Preflight failed; refusing to broadcast:\n - ${report.errors.join('\n - ')}`,
+        );
+      }
+      tx = report.summary.txHex;
+    } else {
+      tx = await this.build();
+    }
     try {
       const txid = await this.provider.sendRawTransaction(tx);
       return raw
@@ -425,18 +717,13 @@ export class Transaction {
       arg instanceof SignatureTemplate ? placeholder(65) : arg
     ));
 
-    // Create a placeholder preimage of the correct size
-    const placeholderPreimage = this.abiFunction.covenant
-      ? placeholder(getPreimageSize(scriptToBytecode(this.redeemScript)))
-      : undefined;
-
-    // Create a placeholder input script for size calculation using the placeholder
-    // arguments and correctly sized placeholder preimage
+    // P5: no placeholder preimage — the legacy BCH preimage-on-stack covenant
+    // path was removed (Radiant uses reference-based introspection and the
+    // Contract constructor rejects `covenant:true` artifacts).
     const placeholderScript = createInputScript(
       this.redeemScript,
       placeholderArgs,
       this.selector,
-      placeholderPreimage,
     );
 
     // Add one extra byte per input to over-estimate tx-in count
@@ -665,6 +952,82 @@ export class Transaction {
         + `(only ${this.outputs.length} output(s)); this would sign the zeroed output hash`,
       );
     }
+  }
+
+  /**
+   * P3: assert the final output set matches the exact outputs declared via
+   * {@link withExactOutputs}. No-op when the caller never opted in.
+   *
+   * The declared outputs must appear first, in order, byte-for-byte (locking
+   * bytecode + amount). One trailing output beyond the declared set is permitted
+   * iff it is an automatically-appended change output paying back to the
+   * contract address AND `allowChange` was not set to `false`. Any other
+   * divergence — wrong count, reordering, mutated amount/script, or an
+   * unexpected extra output — throws with a precise message.
+   */
+  private assertOutputsMatchTemplate(): void {
+    if (this.assertedOutputs === undefined) return;
+
+    const declared = this.assertedOutputs;
+    const built = this.outputs.map(resolveOutput);
+
+    // The built set must be the declared set, optionally followed by exactly one
+    // appended change output.
+    const extra = built.length - declared.length;
+    if (extra < 0 || extra > 1) {
+      throw new Error(
+        `Output template mismatch: declared ${declared.length} exact output(s) but the built `
+        + `transaction has ${built.length}. ${this.describeOutputDelta(declared, built)}`,
+      );
+    }
+    if (extra === 1 && !this.assertedAllowChange) {
+      // Should be unreachable (allowChange:false suppresses change), but guard
+      // in case a caller also added outputs after declaring the exact set.
+      throw new Error(
+        'Output template mismatch: an extra output is present but change was forbidden '
+        + '(allowChange:false). The built output set must equal the declared set exactly.',
+      );
+    }
+
+    for (let k = 0; k < declared.length; k += 1) {
+      if (!resolvedOutputsEqual(declared[k], built[k])) {
+        throw new Error(
+          `Output template mismatch at index ${k}: declared `
+          + `{ script: ${binToHex(declared[k].lockingBytecode)}, amount: ${declared[k].amount} } `
+          + 'but built '
+          + `{ script: ${binToHex(built[k].lockingBytecode)}, amount: ${built[k].amount} }.`,
+        );
+      }
+    }
+
+    // If there is a trailing extra output, it must be the change output paying
+    // back to this contract/address — not an unexpected third-party payment.
+    if (extra === 1) {
+      const changeScript = addressToLockScript(this.address);
+      const trailing = built[built.length - 1];
+      if (binToHex(trailing.lockingBytecode) !== binToHex(changeScript)) {
+        throw new Error(
+          'Output template mismatch: the built transaction has an extra output '
+          + `{ script: ${binToHex(trailing.lockingBytecode)}, amount: ${trailing.amount} } `
+          + `that is not the expected change output back to ${this.address}. `
+          + 'Declare it explicitly or set allowChange:false.',
+        );
+      }
+    }
+  }
+
+  /**
+   * Human-readable hint for an output-count mismatch in the template assertion.
+   */
+  // eslint-disable-next-line class-methods-use-this
+  private describeOutputDelta(declared: ResolvedOutput[], built: ResolvedOutput[]): string {
+    if (built.length > declared.length + 1) {
+      return 'More outputs were built than declared (+ at most one change output is allowed).';
+    }
+    if (built.length < declared.length) {
+      return 'Fewer outputs were built than declared — a declared output went missing.';
+    }
+    return '';
   }
 
   /**

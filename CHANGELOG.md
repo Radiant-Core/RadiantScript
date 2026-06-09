@@ -52,6 +52,44 @@ A fresh adversarial pass found 16 issues beyond the §1–§10 "all closed" set 
   templates rather than production-safe; false "no counterparty risk" / "automatic supply
   conservation" claims removed. (§11.3/M-6)
 
+### 2026-06-09 covenant safety hardening (see [`SECURITY_AUDIT_REPORT.md` §12](./SECURITY_AUDIT_REPORT.md))
+
+Two red-team rounds; all CRITICAL/HIGH/MEDIUM findings fixed and re-verified
+(634 tests passing, lint clean, all `dist/` rebuilt).
+
+#### `@radiantscript/rxdc` (compiler) — Added
+- **Covenant lint pass** — a semantic traversal emitting heuristic warnings for covenant
+  footguns: `missing-value-conservation`, `per-active-input-conservation` (the co-spend class),
+  `unconstrained-outputs`, `aggregate-only`, `missing-continuity`, `continuity-count-trivial`,
+  `auth-only-spend`, `dead-computed-value`. Default `warn` (CLI prints to stderr; JSON stays clean);
+  `--strict` / `covenantLint:'off'|'warn'|'error'` escalate. Key-aware conservation-identity
+  refinement + comment-directive suppression with unknown-rule diagnostics. (§12.1)
+
+#### `radiantscript` (SDK) — Added/Changed
+- **`withExactOutputs()`** — declare the exact output set; `build()` asserts the final set matches
+  byte-exact, so the builder and on-chain covenant can't silently disagree. (§12.3)
+- **`preflight()` / `send({preflight:true})`** — bounded structural pre-broadcast check (dust, fee,
+  counts, conservation, template match, optional `testMempoolAccept`); explicitly NOT a VM. (§12.3)
+- **Removed** the dead BCH preimage-covenant path; the `Contract` constructor now rejects any truthy
+  `covenant` artifact; removed the stale L-2 mixed-hashtype guard. `toRegExp` `MAX_PATTERN_LENGTH`
+  500→2000 (the 500 cap masked every `send()` failure reason). (§12.3)
+
+#### Examples — Added
+- **`examples/covenant-stdlib/`** — five gold-standard, fully-constrained, lint-clean reference
+  covenants (SingletonNFT, FungibleToken, Vault, StatefulCounter, AtomicSwap) + an authoring guide.
+  Red-team found and fixed CRITICAL (AtomicSwap multi-offer drain) / HIGH (Vault co-spend fee-burn) /
+  MEDIUM (FungibleToken brick) bugs; invariant #0 added: never reason about `activeInputIndex` value
+  without an `inputs.length` bound or a tx-wide aggregate. (§12.2, §12.4)
+
+#### Verified
+- **Regtest consensus proofs** (`tools/regtest/covenant-cospend/`) — both round-1 exploit
+  mechanisms proven on the real Radiant v3.1.0 node: the co-spend attack is ACCEPTED on the
+  buggy covenant and REJECTED by consensus on the fixed one, for both the value
+  (`tx.inputs.length==1`) and ref (`tx.inputs.refOutputCount==1`) fixes. (§13.1)
+- **RT-3 + FIX-E/FIX-F** — added linter rules `state-bound-to-noncarrier` and
+  `forwarded-ref-uncontained` (HIGH false-negatives); `OutputTemplate.resolveOutput` now
+  inserts `OP_STATESEPARATOR` to match `buildStatefulOutput`. (§13.2)
+
 ---
 
 ## 2026-05-28 — Audit-remediation release

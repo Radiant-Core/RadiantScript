@@ -1,0 +1,11 @@
+pragma radiantscript ^1.0.0;
+contract MiniVaultBuggy(pubkey owner) {
+    return {
+        spend(sig s, int fee) {
+            require(checkSig(s, owner));
+            int v = tx.inputs[this.activeInputIndex].value;
+            require(tx.outputs[0].value + fee == v);
+            require(tx.outputs.length == 1);
+        }
+    }
+}

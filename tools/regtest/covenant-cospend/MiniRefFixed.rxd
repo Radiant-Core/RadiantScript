@@ -1,0 +1,13 @@
+pragma radiantscript ^1.0.0;
+contract MiniRefFixed(bytes36 offerRef, pubkey owner) {
+    return {
+        take(sig s, int fee) {
+            require(checkSig(s, owner));
+            pushInputRef(offerRef);
+            require(tx.inputs.refOutputCount(offerRef) == 1);
+            int v = tx.inputs[this.activeInputIndex].value;
+            require(tx.outputs[0].value + fee == v);
+            require(tx.outputs.length == 1);
+        }
+    }
+}

@@ -389,3 +389,73 @@ The H-3 txid derivation was factored into a shared `computeDisplayTxid` used by 
 ---
 
 *End of 2026-06-04 red-team pass.*
+
+---
+
+## 12. 2026-06-09 Covenant safety hardening (lint pass + stdlib + SDK) — build→redteam→fix loop
+
+This pass answers "are covenants well-defined and secure?" with engineering. **Verdict going in:** Radiant covenant *primitives* (native introspection + references + state scripts) are well-defined and faithfully mapped to consensus, but the covenant *programming model is powerful-and-unguarded* — security rested entirely on the author manually asserting a complete invariant set, which is why every shipped example template had been exploitable. This pass adds the missing guardrails and proves them under a multi-round red-team.
+
+**End state: 509 root (cashc + utils) + 125 cashscript = 634 tests passing, 0 failing; `npm run lint` clean; all three `dist/` rebuilt; all 5 covenant-stdlib + 5 legacy example contracts compile; stdlib lints at 0 warnings with NO suppressions.**
+
+### 12.1 Covenant lint pass (`packages/cashc/src/semantic/CovenantLintTraversal.ts`)
+
+A new semantic traversal (run after `EnsureFinalRequireTraversal`) emits heuristic WARNINGS for covenant footguns. Default mode `warn` (attached to the artifact, printed to stderr by the CLI; stdout JSON stays clean); `CompileOptions.covenantLint: 'off'|'warn'|'error'` and a `--strict` CLI flag escalate to a build failure. Comment-directive suppression (`// covenant-lint-disable[-line|-next-line] [rule]`) with an unknown-rule meta-warning and a single canonical rule-name set shared with the rule definitions.
+
+**Nine rules.** Initial 5: `unconstrained-outputs`, `dead-computed-value`, `aggregate-only`, `missing-continuity`, `auth-only-spend`. Added after the red-team proved the linter was a syntactic-presence checker that would not catch its own stdlib's bugs: **`missing-value-conservation`** (the #1 footgun — outputs/refs constrained but input↔output value never related), **`per-active-input-conservation`** (value read from `this.activeInputIndex` with no tx-wide aggregate and no anti-co-spend `tx.inputs.length` bound — the exact AtomicSwap/Vault exploit class), **`continuity-count-trivial`** (a `codeScriptCount`/`refOutputCount` continuity check compared to a vacuous constant), and a strengthened `dead-computed-value` (a tautology/range-guard no longer counts as "use"). The `aggregate-only`/`unconstrained-outputs` heuristics were refined to stand down on a **key-aware balanced conservation identity** (`*ValueSum`/`*Count` aggregates with matching keys on both sides of `==`), so the canonical fungible-conservation pattern lints clean without suppression.
+
+### 12.2 Covenant standard library (`examples/covenant-stdlib/`)
+
+Five GOLD-STANDARD, fully-constrained, lint-clean reference covenants — `SingletonNFT`, `FungibleToken`, `Vault`, `StatefulCounter`, `AtomicSwap` — plus a `README.md` authoring guide (the invariant checklist, the "build the expected output then assert equality" idiom, the aggregate-vs-pinned-output trap, the satoshi==amount semantic, and **invariant #0: bound `tx.inputs.length` OR conserve over a tx-wide aggregate — never reason about `activeInputIndex` value alone**). Every contract carries an `// AUDIT:` header and precise `// LIMITATION:` notes where an opcode genuinely can't express an invariant.
+
+### 12.3 SDK covenant support (`packages/cashscript/`)
+
+- **Output-template helpers + `withExactOutputs()`** — declare the exact output set from one source of truth; `build()` asserts the final set (after change) matches byte-exact, so the builder and the on-chain covenant cannot silently disagree.
+- **`preflight()` / `send({preflight:true})`** — a bounded, honest structural pre-broadcast check (dust, fee bounds, counts, value conservation, output-template match, optional provider `testMempoolAccept`). Documented loudly as NOT a consensus VM.
+- **Dead BCH preimage-covenant path removed** and the `Contract` constructor now rejects any truthy `abiFunction.covenant` artifact (Radiant uses reference-based introspection; the compiler never sets the flag). The now-stale L-2 mixed-hashtype guard was removed (each covenant signature is signed over its own per-arg sighash and validates independently).
+- **`toRegExp` fix** — `MAX_PATTERN_LENGTH` 500→2000; the 500 cap had made `buildError` throw "Pattern too long" on every `send()` failure, masking the real reason (the RadiantMM/RadiantSwap error path).
+
+### 12.4 The red-team loop (the value of build→redteam→fix→repeat)
+
+- **Round 1** (independent agents, grounded in Radiant-Core consensus source): the "gold-standard" stdlib was NOT sound — **AtomicSwap.executeSwap CRITICAL** (taker drains N offers for one `wantAmount` by co-spending two offer-carrying covenant UTXOs), **Vault.pay HIGH** (two equal-value vault UTXOs co-spent → one burned to fee / miner-collusion theft), **FungibleToken.transfer MEDIUM** (malformed continuation state bricks the UTXO). Shared root cause: reasoning about `activeInputIndex` value without an `inputs.length` bound or tx-wide aggregate. The linter was found to be syntactic-only — it had **no value-conservation rule** and would not have caught its own stdlib's CRITICAL bug. *Fixed:* AtomicSwap `+= require(tx.inputs.refOutputCount($offerTokenRef) == 1)`; Vault `+= require(tx.inputs.length == 1)` and a pinned `emergencyRecover` to a constructor `recoveryPkh`; FungibleToken split into a state-binding single-recipient `transfer` + a documented `transferMulti`; linter gained the 4 new rules above.
+- **Round 2** (convergence red-team): the stdlib fixes were confirmed solid and consensus-grounded, but the NEW linter rules had **4 false negatives** — most importantly the conservation-identity refinement was **key-blind** (`codeScriptValueSum(cshA) == codeScriptValueSum(cshB)` with mismatched keys accepted as conservation → a value-leaking covenant lints clean), plus vacuous-guard bypasses (`tx.inputs.length >= 1`, count `< 1`/`> -1`). *Fixed (FIX-D):* the refinement is now key-aware (fail-safe — opaque keys never match), and the count/`inputs.length` comparisons are normalized against their known sign before being treated as constraints.
+- **Convergence** independently verified: the upgraded linter now flags every red-team repro (incl. `per-active-input-conservation` on the exact AtomicSwap/Vault class), the key-blind and vacuous-guard exploits are caught, and the 5 stdlib contracts stay at 0 warnings (no new false positives).
+
+The headline lesson, now encoded in tooling: **a covenant that reasons about `this.activeInputIndex` without bounding `tx.inputs.length` or conserving over a tx-wide aggregate is exploitable whenever two identical covenant UTXOs are co-spent** — and the linter now catches it.
+
+---
+
+*End of 2026-06-09 covenant safety hardening.*
+
+---
+
+## 13. 2026-06-09 Covenant verification round 2 — regtest consensus proofs + RT-3
+
+A second loop: another red-team pass plus **on-chain consensus verification** against the real Radiant v3.1.0 node (`Radiant-Core/build/src/radiantd -regtest`, all ref/introspection opcodes active at height ≥ 111).
+
+### 13.1 Regtest consensus proofs (`tools/regtest/covenant-cospend/`)
+
+The two round-1 exploit classes — and the FIX-A fixes — were proven at the **consensus** level, not just analytically. For each, a *buggy* and a *fixed* covenant were deployed as bare scripts via `@radiant-core/radiantjs`, then a legitimate spend and the co-spend attack were broadcast:
+
+| Mechanism | Buggy | Fixed |
+|---|---|---|
+| **Value co-spend** — `require(tx.inputs.length == 1)` (`OP_TXINPUTCOUNT`; Vault HIGH) | co-spend **ACCEPTED** (one UTXO burned to fee — exploit real on-chain) | co-spend **REJECTED** by consensus (`mandatory-script-verify-flag-failed`, `OP_NUMEQUALVERIFY`) |
+| **Ref co-spend** — `require(tx.inputs.refOutputCount(ref) == 1)` (`OP_REFOUTPUTCOUNT_UTXOS`; AtomicSwap CRITICAL) | 2-offer co-spend **ACCEPTED** (drain real on-chain) | 2-offer co-spend **REJECTED** by consensus |
+
+The legitimate single-input spend is ACCEPTED for both variants, so each fix rejects only the attack. The minimal models emit the same guard opcodes as the shipped `examples/covenant-stdlib/{Vault,AtomicSwap}.rxd`, so the consensus behaviour transfers. Harnesses + models retained for regression.
+
+### 13.2 RT-3 red-team — verified the stdlib *logic* is consensus-sound; found 3 NEW tooling gaps
+
+Grounded in Radiant-Core source (`validation.h validatePushRefRule` / `validateDisallowedSiblingsRefRule`, `script_execution_context.h codeScriptHash`, `interpreter.cpp`), RT-3 confirmed the five stdlib covenants are sound: SingletonNFT's singleton uniqueness is real (consensus disallow-sibling rule), StatefulCounter's `bytes4`/`OP_NUM2BIN` state encoding is non-malleable and range-guarded, and the `codeScriptHash`-excludes-state grouping is handled correctly. The new findings were all in tooling:
+
+- **[HIGH] L-1 (linter) `state-bound-to-noncarrier`** — a covenant pinning code/value/ref continuity to `outputs[i]` but binding the next state to `outputs[j≠i]` left the real carrier's state unconstrained and lint-clean. *Fixed (FIX-E):* warn when a `stateScript` binding targets an index other than the single pinned continuation carrier.
+- **[HIGH] L-2 (linter) `forwarded-ref-uncontained`** — because the consensus push-ref rule is only a subset check (output-refs ⊆ input-refs), a non-singleton ref forwarded via `pushInputRef` but never constrained by `refOutputCount` (or a `codeScriptCount==refOutputCount` stitch) can be split into a foreign script; this lint-clean. *Fixed (FIX-E):* warn on a forwarded non-singleton ref whose output containment is never pinned (singletons exempt — consensus-unique).
+- **[MEDIUM] SDK-1** — `OutputTemplate.resolveOutput` prepended `stateScript` verbatim with no `OP_STATESEPARATOR`, contradicting its doc and `RadiantHelpers.buildStatefulOutput`; a doc-following caller got a malformed stateful output (`stateSeparatorByteIndex==0`), so `preflight`/`withExactOutputs` gave false confidence (fail-safe — rejected on-chain). *Fixed (FIX-F):* `resolveOutput` now delegates to `buildStatefulOutput` (byte-identical), docs corrected, size-accounting updated.
+
+### 13.3 End state
+
+**516 root (cashc + utils) + 128 cashscript = 644 tests passing, 0 failing; `npm run lint` clean; all `dist/` rebuilt; 5 covenant-stdlib contracts at 0 lint warnings (no suppressions); 2 consensus-level co-spend proofs green.** The covenant lint pass now carries 11 rules; the two round-1 exploit mechanisms are proven rejected by the real consensus VM.
+
+---
+
+*End of 2026-06-09 covenant verification round 2.*

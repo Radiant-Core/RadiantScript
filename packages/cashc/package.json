@@ -1,6 +1,6 @@
 {
   "name": "@radiantscript/rxdc",
-  "version": "1.1.1-v2",
+  "version": "1.2.0",
   "description": "Compile RadiantScript contracts to Radiant Script or artifacts",
   "keywords": [
     "radiant",
@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "@bitauth/libauth": "^1.19.1",
-    "@radiantscript/utils": "^0.7.3",
+    "@radiantscript/utils": "^0.7.4",
     "antlr4ts": "^0.5.0-alpha.4",
     "commander": "^12.0.0",
     "semver": "^7.6.0"

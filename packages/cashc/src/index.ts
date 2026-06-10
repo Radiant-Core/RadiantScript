@@ -6,4 +6,4 @@ export { compileFile, compileString } from './compiler.js';
 // The repo's `update-version.ts` script rewrites this line on each release.
 // We use a literal rather than `require('../package.json')` so the same source
 // works for both the CommonJS and the ES module build (ESM has no `require`).
-export const version = '1.1.1-v2';
+export const version = '1.2.0';

@@ -14,6 +14,51 @@ to the corresponding finding — lives in [`SECURITY_AUDIT_REPORT.md`](./SECURIT
 
 ## [Unreleased]
 
+_Nothing yet._
+
+---
+
+## 2026-06-10 — Security-republish release
+
+Republishes all three packages to npm. The prior npm release (2026-05-29)
+predated the June security work, so the **published compiler still shipped the
+integer `*` / `/` miscompile** (`OP_2MUL` / `OP_2DIV`) and none of the red-team /
+covenant-lint hardening detailed below. This release adds no new source changes —
+it ships the already-merged fixes to npm. 644 tests passing, lint clean, all
+`dist/` rebuilt.
+
+### `@radiantscript/utils` 0.7.3 → **0.7.4**
+
+Patch — additive `LintWarning` export, consumed by the compiler's new
+covenant-lint pass. No breaking changes; the existing `^0.7.x` ranges continue to
+resolve.
+
+### `@radiantscript/rxdc` (compiler) 1.1.1-v2 → **1.2.0**
+
+Minor, and the `-v2` prerelease suffix is **dropped** for a clean semver line
+going forward. Ships three fixes that never reached npm:
+
+- **[CRITICAL] integer `*` / `/` miscompile fixed.** `compileBinaryOp` mapped the
+  *binary* `*`→`OP_2MUL` and `/`→`OP_2DIV` — which are *unary* ×2 / ÷2 — so any
+  contract doing real multiplication or division (e.g. a CPMM `K = x*y`) compiled
+  to a silently wrong, stack-corrupting script. Now maps to `OP_MUL` / `OP_DIV`.
+  (commit `7d11a8a`; supersedes the erroneous "emits `OP_2DIV`" note in the
+  2026-05-28 section below, which described the bug as intended.)
+- The **2026-06-04 red-team compiler fixes** (no-`else` `if` unconditional spend,
+  `bool ==` bytewise-equality bypass, lossy int-literal parsing) — detailed below.
+- The **2026-06-09 covenant-lint pass** (11 heuristic footgun rules) — detailed below.
+
+Dependency floor raised to `@radiantscript/utils ^0.7.4` (the compiler now imports
+`LintWarning` from utils).
+
+### `radiantscript` (SDK) 0.8.0 → **0.9.0**
+
+Minor. Ships the **2026-06-04 prevout-verification hardening** and the
+**2026-06-09 covenant support** (`withExactOutputs`, `preflight`) — both detailed
+below. Dependency floor raised to `@radiantscript/utils ^0.7.4`.
+
+---
+
 ### 2026-06-04 red-team remediation (see [`SECURITY_AUDIT_REPORT.md` §11](./SECURITY_AUDIT_REPORT.md))
 
 A fresh adversarial pass found 16 issues beyond the §1–§10 "all closed" set — including a

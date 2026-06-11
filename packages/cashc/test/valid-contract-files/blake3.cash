@@ -1,0 +1,8 @@
+contract Blake3Commit(bytes32 commitment) {
+    return {
+        reveal(bytes preimage) {
+            // The revealed preimage must hash (BLAKE3) to the committed digest.
+            require(blake3(preimage) == commitment);
+        }
+    }
+}

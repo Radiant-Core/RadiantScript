@@ -1,7 +1,7 @@
 const { BITBOX } = require('bitbox-sdk');
 const { stringify } = require('@bitauth/libauth');
-const { Contract, SignatureTemplate, ElectrumNetworkProvider } = require('cashscript');
-const { compileFile } = require('cashc');
+const { Contract, SignatureTemplate, ElectrumNetworkProvider } = require('radiantscript');
+const { compileFile } = require('@radiantscript/rxdc');
 const path = require('path');
 
 run();

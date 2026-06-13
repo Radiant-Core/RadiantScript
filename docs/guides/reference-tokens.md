@@ -97,6 +97,35 @@ contract NFT(bytes36 constant $nftRef, pubkey ownerPk) {
 | `tx.inputs.refHashValueSum(ref)` | Hash-based value sum (advanced) |
 | `tx.outputs.refHashValueSum(ref)` | Hash-based value sum (advanced) |
 
+## ⚠️ Constraint: there is NO global circulating-supply read
+
+`refValueSum` (and every function in the table above) sums **only the carriers spent or created in the current transaction** — `tx.inputs.refValueSum($ref)` sums co-spent inputs, `tx.outputs.refValueSum($ref)` sums created outputs. **Radiant has no opcode that reads the global circulating supply `S` of a fungible ref across the whole UTXO set.** A spender chooses which of their own carriers to co-spend, so they *set* the value any covenant sees.
+
+This breaks any covenant that needs a **supply-relative rate** — a payout or mint computed against the global total `S`:
+
+```radiantscript
+// ❌ DRAINABLE — do NOT do this
+int S_seen = tx.inputs.refValueSum($shareRef);   // NOT global supply — only what the spender co-spent
+int payout = burned * R / S_seen;                 // proportional burn payout
+```
+
+A burner who co-spends **only their own** shares makes `S_seen == their own stake`, so `payout = burned * R / burned = R` — the entire reserve drains in one transaction. The mirror image, a proportional mint `minted = dR * S / R`, bricks on an honest add when `S_seen` is 0 (no passthrough carrier co-spent).
+
+### ✅ Safe pattern: pin a 1:1 collateral DELTA, never an absolute sum
+
+The audited pattern used by RadiantSwap's [`Market.rxd`](../../../RadiantSwap/contracts/Market.rxd) `split`/`merge` is to pin a ref-value **delta** to a co-spent **collateral delta** — never to read an absolute `refValueSum`:
+
+```radiantscript
+// ✅ SAFE — mint/burn pinned 1:1 to the collateral delta
+int n = tx.outputs[0].value - tx.inputs[0].value;                       // collateral added (split) ...
+require(n > 0);
+require(tx.outputs.refValueSum($shareRef) - tx.inputs.refValueSum($shareRef) == n);   // ... mints exactly n
+```
+
+A **delta** is presence- and padding-invariant: any passthrough carrier the spender adds appears in *both* the input sum and the output sum, so it cancels. The spender cannot influence the result by choosing what to co-spend. Burn is the symmetric `n = in[0].value - out[0].value` with the inputs−outputs delta.
+
+**Rule of thumb:** express every covenant check as a value/ref **delta** (`out − in == n`). If you find yourself reading an absolute `refValueSum` and dividing by it for a rate, stop — that quantity is spender-selectable, not the global supply. Fully-proportional LP/share models (Uniswap's `dR·S/R`) are blocked on this missing primitive; see RadiantMM's `docs/LP-SHARE-COVENANT-DESIGN.md` for the trustless workaround (an authenticated in-controller `shareTotal` scalar, every mutation delta-pinned).
+
 ## Token Minting
 
 To mint new tokens, create a genesis transaction that:
